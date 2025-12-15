@@ -112,10 +112,10 @@ router.get('/interest', (req, res) => {
     // Fetch from database
     const rates = RateModel.getInterestRates();
     const formatted = fillAllCountries(formatRatesForMap(rates) as RateRow[]);
-    
+
     // Cache the result
     cache.set(cacheKeys.interestRates, formatted);
-    
+
     res.json(formatted);
   } catch (error) {
     console.error('Error fetching interest rates:', error);
@@ -134,10 +134,10 @@ router.get('/inflation', (req, res) => {
     // Fetch from database
     const rates = RateModel.getInflationRates();
     const formatted = fillAllCountries(formatRatesForMap(rates) as RateRow[]);
-    
+
     // Cache the result
     cache.set(cacheKeys.inflationRates, formatted);
-    
+
     res.json(formatted);
   } catch (error) {
     console.error('Error fetching inflation rates:', error);
@@ -173,14 +173,67 @@ router.get('/exchange', async (req, res) => {
     }
 
     const formatted = fillAllCountries(formatRatesForMap(rates) as RateRow[]);
-    
+
     // Cache the result
     cache.set(cacheKeys.exchangeRates, formatted);
-    
+
     res.json(formatted);
   } catch (error) {
     console.error('Error fetching exchange rates:', error);
     res.status(500).json({ error: 'Failed to fetch exchange rates' });
+  }
+});
+
+router.get('/gdp', (req, res) => {
+  try {
+    const cached = cache.get(cacheKeys.gdpGrowthRates);
+    if (cached) return res.json(cached);
+
+    const rates = RateModel.getGDPGrowthRates();
+    const formatted = fillAllCountries(formatRatesForMap(rates) as RateRow[]);
+
+    cache.set(cacheKeys.gdpGrowthRates, formatted);
+    res.json(formatted);
+  } catch (error) {
+    console.error('Error fetching GDP growth rates:', error);
+    res.status(500).json({ error: 'Failed to fetch GDP growth rates' });
+  }
+});
+
+router.get('/unemployment', (req, res) => {
+  try {
+    const cached = cache.get(cacheKeys.unemploymentRates);
+    if (cached) return res.json(cached);
+
+    const rates = RateModel.getUnemploymentRates();
+    const formatted = fillAllCountries(formatRatesForMap(rates) as RateRow[]);
+
+    cache.set(cacheKeys.unemploymentRates, formatted);
+    res.json(formatted);
+  } catch (error) {
+    console.error('Error fetching unemployment rates:', error);
+    res.status(500).json({ error: 'Failed to fetch unemployment rates' });
+  }
+});
+
+router.get('/history/:countryIso/:type', (req, res) => {
+  try {
+    const { countryIso, type } = req.params;
+
+    // Basic validation
+    if (!countryIso || !['interest', 'inflation', 'exchange', 'gdp', 'unemployment'].includes(type)) {
+      return res.status(400).json({ error: 'Invalid country code or data type' });
+    }
+
+    // Historical data is dynamic and country-specific, maybe short-term cache?
+    // For now, no cache or very short TTL if implemented.
+    const history = RateModel.getHistoricalRates(countryIso, type as any);
+
+    // Simple response, no need to "fill all countries" or global averages
+    res.json(history);
+  } catch (error) {
+    console.error(`Error fetching history for ${req.params.countryIso}/${req.params.type}:`, error);
+    res.status(500).json({ error: 'Failed to fetch historical data' });
   }
 });
 

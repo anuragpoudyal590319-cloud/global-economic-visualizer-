@@ -1,4 +1,5 @@
-export type DataType = 'interest' | 'inflation' | 'exchange';
+export type DataType = 'interest' | 'inflation' | 'exchange' | 'gdp' | 'unemployment';
+
 
 export interface Country {
   id: number;

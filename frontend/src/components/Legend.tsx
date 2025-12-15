@@ -26,8 +26,15 @@ export default function Legend({ dataType, rateData }: LegendProps) {
         return 'Inflation Rate (%)';
       case 'exchange':
         return 'Exchange Rate (vs USD)';
+      case 'gdp':
+        return 'GDP Growth Rate (%)';
+      case 'unemployment':
+        return 'Unemployment Rate (%)';
+      default:
+        return 'Rate';
     }
   };
+
 
   return (
     <div
@@ -44,9 +51,9 @@ export default function Legend({ dataType, rateData }: LegendProps) {
         border: '1px solid #e0e0e0',
       }}
     >
-      <div style={{ 
-        marginBottom: '10px', 
-        fontWeight: '600', 
+      <div style={{
+        marginBottom: '10px',
+        fontWeight: '600',
         fontSize: '15px',
         color: '#333',
         borderBottom: '1px solid #eee',

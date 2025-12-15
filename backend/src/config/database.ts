@@ -39,6 +39,22 @@ interface DatabaseData {
     effective_date?: string;
     updated_at: string;
   }>;
+  gdp_growth_rates: Array<{
+    id: number;
+    country_iso: string;
+    rate: number;
+    source?: string;
+    effective_date?: string;
+    updated_at: string;
+  }>;
+  unemployment_rates: Array<{
+    id: number;
+    country_iso: string;
+    rate: number;
+    source?: string;
+    effective_date?: string;
+    updated_at: string;
+  }>;
 }
 
 const dbPath = process.env.DATABASE_PATH || path.join(__dirname, '../../data/economic_data.json');
@@ -55,6 +71,8 @@ const emptyDb: DatabaseData = {
   interest_rates: [],
   inflation_rates: [],
   exchange_rates: [],
+  gdp_growth_rates: [],
+  unemployment_rates: [],
 };
 
 // Load database from file
@@ -62,7 +80,9 @@ function loadDb(): DatabaseData {
   if (fs.existsSync(dbPath)) {
     try {
       const data = fs.readFileSync(dbPath, 'utf-8');
-      return JSON.parse(data);
+      // Migrate old DB if needed (add missing arrays)
+      const parsed = JSON.parse(data);
+      return { ...emptyDb, ...parsed };
     } catch (error) {
       console.warn('Error loading database, creating new one:', error);
       return JSON.parse(JSON.stringify(emptyDb));
@@ -152,35 +172,19 @@ class Statement {
         return results;
       }
       
-      if (sql.includes('FROM INTEREST_RATES')) {
-        return data.interest_rates.map((rate: any) => {
-          const country = data.countries.find((c: any) => c.iso_code === rate.country_iso);
-          return {
-            ...rate,
-            country_name: country?.name,
-          };
-        }).sort((a: any, b: any) => new Date(b.updated_at).getTime() - new Date(a.updated_at).getTime());
-      }
-      
-      if (sql.includes('FROM INFLATION_RATES')) {
-        return data.inflation_rates.map((rate: any) => {
-          const country = data.countries.find((c: any) => c.iso_code === rate.country_iso);
-          return {
-            ...rate,
-            country_name: country?.name,
-          };
-        }).sort((a: any, b: any) => new Date(b.updated_at).getTime() - new Date(a.updated_at).getTime());
-      }
-      
-      if (sql.includes('FROM EXCHANGE_RATES')) {
-        return data.exchange_rates.map((rate: any) => {
-          const country = data.countries.find((c: any) => c.iso_code === rate.country_iso);
-          return {
-            ...rate,
-            country_name: country?.name,
-          };
-        }).sort((a: any, b: any) => new Date(b.updated_at).getTime() - new Date(a.updated_at).getTime());
-      }
+      const mapResults = (arr: any[]) => arr.map((rate: any) => {
+        const country = data.countries.find((c: any) => c.iso_code === rate.country_iso);
+        return {
+          ...rate,
+          country_name: country?.name,
+        };
+      }).sort((a: any, b: any) => new Date(b.effective_date || b.updated_at).getTime() - new Date(a.effective_date || a.updated_at).getTime());
+
+      if (sql.includes('FROM INTEREST_RATES')) return mapResults(data.interest_rates);
+      if (sql.includes('FROM INFLATION_RATES')) return mapResults(data.inflation_rates);
+      if (sql.includes('FROM EXCHANGE_RATES')) return mapResults(data.exchange_rates);
+      if (sql.includes('FROM GDP_GROWTH_RATES')) return mapResults(data.gdp_growth_rates);
+      if (sql.includes('FROM UNEMPLOYMENT_RATES')) return mapResults(data.unemployment_rates);
     }
 
     // INSERT queries
@@ -240,6 +244,24 @@ class Statement {
           effective_date: params[4] || null,
         }, isWrite);
       }
+
+      if (sql.includes('INTO GDP_GROWTH_RATES')) {
+        return this.upsertRate(data.gdp_growth_rates, 'country_iso', {
+          country_iso: params[0],
+          rate: params[1],
+          source: params[2] || null,
+          effective_date: params[3] || null,
+        }, isWrite);
+      }
+
+      if (sql.includes('INTO UNEMPLOYMENT_RATES')) {
+        return this.upsertRate(data.unemployment_rates, 'country_iso', {
+          country_iso: params[0],
+          rate: params[1],
+          source: params[2] || null,
+          effective_date: params[3] || null,
+        }, isWrite);
+      }
     }
 
     return [];
@@ -251,9 +273,15 @@ class Statement {
     newRate: any,
     isWrite: boolean
   ): any[] {
-    const existing = rates.findIndex((r: any) => r[key] === newRate[key]);
-    const id = existing >= 0 
-      ? rates[existing].id 
+    // Check if exists for same Country AND same Date (History Logic)
+    // If effective_date is missing, use a fuzzy match or just fallback to update
+    const existingIndex = rates.findIndex((r: any) => 
+      r[key] === newRate[key] && 
+      (newRate.effective_date ? r.effective_date === newRate.effective_date : true) // If provided date matches
+    );
+
+    const id = existingIndex >= 0 
+      ? rates[existingIndex].id 
       : (rates.length > 0 ? Math.max(...rates.map((r: any) => r.id || 0)) + 1 : 1);
     
     const rate = {
@@ -262,10 +290,10 @@ class Statement {
       updated_at: new Date().toISOString(),
     };
     
-    if (existing >= 0) {
-      rates[existing] = rate;
+    if (existingIndex >= 0) {
+      rates[existingIndex] = rate; // Update
     } else {
-      rates.push(rate);
+      rates.push(rate); // Insert new history point
     }
     
     if (isWrite) this.save();
@@ -273,11 +301,15 @@ class Statement {
   }
 
   private upsertExchangeRate(rates: any[], newRate: any, isWrite: boolean): any[] {
-    const existing = rates.findIndex(
-      (r: any) => r.country_iso === newRate.country_iso && r.currency_code === newRate.currency_code
+     // Check if exists for same Country AND Currency AND Date
+    const existingIndex = rates.findIndex(
+      (r: any) => r.country_iso === newRate.country_iso && 
+                  r.currency_code === newRate.currency_code &&
+                  (newRate.effective_date ? r.effective_date === newRate.effective_date : true)
     );
-    const id = existing >= 0 
-      ? rates[existing].id 
+
+    const id = existingIndex >= 0 
+      ? rates[existingIndex].id 
       : (rates.length > 0 ? Math.max(...rates.map((r: any) => r.id || 0)) + 1 : 1);
     
     const rate = {
@@ -286,8 +318,8 @@ class Statement {
       updated_at: new Date().toISOString(),
     };
     
-    if (existing >= 0) {
-      rates[existing] = rate;
+    if (existingIndex >= 0) {
+      rates[existingIndex] = rate;
     } else {
       rates.push(rate);
     }
@@ -302,12 +334,8 @@ export const db = new SimpleDatabase() as any;
 // Initialize database schema
 export function initializeDatabase() {
   const data = (db as any).data;
-  
-  // Schema is handled by the JSON structure itself
-  // Just ensure the file exists
   if (!fs.existsSync(dbPath)) {
     saveDb(emptyDb);
   }
-  
   console.log('Database initialized successfully');
 }

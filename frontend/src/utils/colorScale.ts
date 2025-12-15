@@ -24,7 +24,7 @@ export function getColorForValue(
         ['#e3f2fd', '#90caf9', '#42a5f5', '#1e88e5', '#1565c0', '#0d47a1'],
         clamped
       );
-    
+
     case 'inflation':
       // Red-orange-yellow gradient for inflation (higher = more concerning)
       // Low: Yellow, Medium: Orange, High: Red
@@ -32,7 +32,7 @@ export function getColorForValue(
         ['#fff9c4', '#fff176', '#ffb74d', '#ff9800', '#f57c00', '#d32f2f'],
         clamped
       );
-    
+
     case 'exchange':
       // Green-teal gradient for exchange rates
       // Low: Light green, High: Deep teal
@@ -40,7 +40,7 @@ export function getColorForValue(
         ['#e8f5e9', '#a5d6a7', '#66bb6a', '#43a047', '#2e7d32', '#1b5e20'],
         clamped
       );
-    
+
     default:
       return '#e0e0e0';
   }
@@ -49,30 +49,30 @@ export function getColorForValue(
 // Multi-color interpolation for smoother gradients
 function interpolateColorScale(colors: string[], factor: number): string {
   if (colors.length < 2) return colors[0] || '#cccccc';
-  
+
   const segmentSize = 1 / (colors.length - 1);
   const segmentIndex = Math.min(
     Math.floor(factor / segmentSize),
     colors.length - 2
   );
-  
+
   const localFactor = (factor - segmentIndex * segmentSize) / segmentSize;
   const color1 = colors[segmentIndex];
   const color2 = colors[segmentIndex + 1];
-  
+
   return interpolateColor(color1, color2, localFactor);
 }
 
 function interpolateColor(color1: string, color2: string, factor: number): string {
   const c1 = hexToRgb(color1);
   const c2 = hexToRgb(color2);
-  
+
   if (!c1 || !c2) return '#cccccc';
-  
+
   const r = Math.round(c1.r + (c2.r - c1.r) * factor);
   const g = Math.round(c1.g + (c2.g - c1.g) * factor);
   const b = Math.round(c1.b + (c2.b - c1.b) * factor);
-  
+
   return `rgb(${r}, ${g}, ${b})`;
 }
 
@@ -80,10 +80,10 @@ function hexToRgb(hex: string): { r: number; g: number; b: number } | null {
   const result = /^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i.exec(hex);
   return result
     ? {
-        r: parseInt(result[1], 16),
-        g: parseInt(result[2], 16),
-        b: parseInt(result[3], 16),
-      }
+      r: parseInt(result[1], 16),
+      g: parseInt(result[2], 16),
+      b: parseInt(result[3], 16),
+    }
     : null;
 }
 
@@ -91,11 +91,11 @@ export function getValueRange(data: Array<{ value: number | null }>): { min: num
   const values = data
     .map((d) => d.value)
     .filter((v): v is number => v !== null && !isNaN(v));
-  
+
   if (values.length === 0) {
     return { min: 0, max: 1 };
   }
-  
+
   return {
     min: Math.min(...values),
     max: Math.max(...values),
@@ -114,7 +114,12 @@ function getPalette(dataType: DataType, bins: number): string[] {
     inflation: ['#000004', '#2c115f', '#721f81', '#b63679', '#f1605d', '#fca636', '#fcfdbf'],
     // Cividis-like
     exchange: ['#00204c', '#2c3e70', '#4a6479', '#5f8d7b', '#88b578', '#c9dd75', '#fffdbf'],
+    // Greens (GDP Growth - High is good)
+    gdp: ['#f7fcf5', '#e5f5e0', '#c7e9c0', '#a1d99b', '#74c476', '#41ab5d', '#238b45'],
+    // Reds (Unemployment - High is bad)
+    unemployment: ['#fef0d9', '#fdd49e', '#fdbb84', '#fc8d59', '#ef6548', '#d73027', '#990000'],
   };
+
   const base = palettes[dataType] || palettes.interest;
 
   // If caller wants fewer bins, sample evenly from base.

@@ -14,5 +14,8 @@ export const cacheKeys = {
   interestRates: 'rates:interest',
   inflationRates: 'rates:inflation',
   exchangeRates: 'rates:exchange',
+  gdpGrowthRates: 'rates:gdp',
+  unemploymentRates: 'rates:unemployment',
 };
+
 

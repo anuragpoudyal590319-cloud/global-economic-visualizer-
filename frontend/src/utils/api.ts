@@ -24,5 +24,21 @@ export const api = {
     const response = await axios.get<RateData[]>(`${API_URL}/rates/exchange`);
     return response.data;
   },
+
+  getGDPGrowthRates: async (): Promise<RateData[]> => {
+    const response = await axios.get<RateData[]>(`${API_URL}/rates/gdp`);
+    return response.data;
+  },
+
+  getUnemploymentRates: async (): Promise<RateData[]> => {
+    const response = await axios.get<RateData[]>(`${API_URL}/rates/unemployment`);
+    return response.data;
+  },
+
+  getHistoricalRates: async (countryIso: string, type: string): Promise<any[]> => {
+    const response = await axios.get<any[]>(`${API_URL}/rates/history/${countryIso}/${type}`);
+    return response.data;
+  },
 };
+
 

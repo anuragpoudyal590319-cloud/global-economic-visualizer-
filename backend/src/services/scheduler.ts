@@ -34,11 +34,36 @@ cron.schedule('0 4 1 * *', async () => {
   console.log('Running scheduled inflation rates update...');
   try {
     await fetchInflationRates();
-    // Invalidate cache
     cache.del(cacheKeys.inflationRates);
     console.log('Inflation rates updated successfully');
   } catch (error) {
     console.error('Error in scheduled inflation rates update:', error);
+  }
+});
+
+// Monthly on 2nd at 4 AM UTC - GDP Growth
+cron.schedule('0 4 2 * *', async () => {
+  console.log('Running scheduled GDP growth update...');
+  try {
+    const { fetchGDPGrowthRates } = await import('./worldBankService');
+    await fetchGDPGrowthRates();
+    cache.del(cacheKeys.gdpGrowthRates);
+    console.log('GDP growth updated successfully');
+  } catch (error) {
+    console.error('Error in scheduled GDP growth update:', error);
+  }
+});
+
+// Monthly on 3rd at 4 AM UTC - Unemployment
+cron.schedule('0 4 3 * *', async () => {
+  console.log('Running scheduled unemployment update...');
+  try {
+    const { fetchUnemploymentRates } = await import('./worldBankService');
+    await fetchUnemploymentRates();
+    cache.del(cacheKeys.unemploymentRates);
+    console.log('Unemployment rates updated successfully');
+  } catch (error) {
+    console.error('Error in scheduled unemployment update:', error);
   }
 });
 

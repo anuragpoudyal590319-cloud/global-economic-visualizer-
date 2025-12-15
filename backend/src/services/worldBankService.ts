@@ -5,123 +5,128 @@ import { CountryModel } from '../models/Country';
 const WORLD_BANK_API_URL = process.env.WORLD_BANK_API_URL || 'https://api.worldbank.org/v2';
 
 // World Bank country code mapping (ISO-3166-1 alpha-2 to World Bank codes)
-// Most are the same, but some differ
 const WB_COUNTRY_CODE_MAP: Record<string, string> = {
   // Add special mappings if needed
-  // Most countries use same code
 };
 
 function getWorldBankCountryCode(isoCode: string): string {
   return WB_COUNTRY_CODE_MAP[isoCode] || isoCode;
 }
 
-export async function fetchInterestRates(): Promise<void> {
+// Generic fetcher for World Bank indicators
+async function fetchIndicator(
+  indicatorCode: string,
+  onData: (countryIso: string, value: number, date: string) => void,
+  label: string
+) {
   try {
-    console.log('Fetching interest rates from World Bank...');
-    
+    console.log(`Fetching ${label} from World Bank...`);
+
     const countries = CountryModel.getAll();
     let successCount = 0;
     let errorCount = 0;
 
-    // World Bank API: Interest rate indicator
-    // FR.INR.RINR = Real interest rate
-    // We'll use a batch approach - fetch for multiple countries
+    // Batch sizing
     const batchSize = 10;
-    
+
+    // Fetch last 15 years of data to populate history
+    const dateRange = `${new Date().getFullYear() - 15}:${new Date().getFullYear()}`;
+
     for (let i = 0; i < countries.length; i += batchSize) {
       const batch = countries.slice(i, i + batchSize);
-      
+
       for (const country of batch) {
         try {
           const wbCode = getWorldBankCountryCode(country.iso_code);
-          const url = `${WORLD_BANK_API_URL}/country/${wbCode}/indicator/FR.INR.RINR?format=json&per_page=1`;
-          
+          // Fetch historical data with date query
+          const url = `${WORLD_BANK_API_URL}/country/${wbCode}/indicator/${indicatorCode}?format=json&per_page=20&date=${dateRange}`;
+
           const response = await axios.get(url);
           const data = response.data;
 
-          if (data && data[1] && data[1].length > 0) {
-            const latest = data[1][0];
-            const rate = parseFloat(latest.value);
+          if (data && data[1] && Array.isArray(data[1])) {
+            const records = data[1];
+            let recordsProcessed = 0;
 
-            if (!isNaN(rate)) {
-              RateModel.upsertInterestRate({
-                country_iso: country.iso_code,
-                rate: rate,
-                source: 'worldbank',
-                effective_date: latest.date || null,
-              });
-              successCount++;
+            for (const record of records) {
+              const value = parseFloat(record.value);
+              if (!isNaN(value)) {
+                // Determine date
+                // World Bank returns "date" as "2022" for yearly data.
+                // We'll normalize to ISO date (e.g. 2022-01-01) for consistency.
+                const year = parseInt(record.date);
+                const isoDate = !isNaN(year) ? `${year}-01-01` : null;
+
+                if (isoDate) {
+                  onData(country.iso_code, value, isoDate);
+                  recordsProcessed++;
+                }
+              }
             }
+            if (recordsProcessed > 0) successCount++;
           }
 
-          // Rate limiting: small delay between requests
-          await new Promise(resolve => setTimeout(resolve, 100));
+          // Rate limiting
+          await new Promise(resolve => setTimeout(resolve, 50));
         } catch (error) {
           errorCount++;
-          console.warn(`Failed to fetch interest rate for ${country.iso_code}:`, error);
+          // console.warn(`Failed to fetch ${label} for ${country.iso_code}`);
         }
       }
     }
 
-    console.log(`Interest rates: ${successCount} successful, ${errorCount} errors`);
+    console.log(`${label}: ${successCount} countries updated successfully, ${errorCount} errors`);
   } catch (error) {
-    console.error('Error fetching interest rates:', error);
+    console.error(`Error fetching ${label}:`, error);
     throw error;
   }
+}
+
+export async function fetchInterestRates(): Promise<void> {
+  // FR.INR.RINR = Real interest rate
+  await fetchIndicator('FR.INR.RINR', (iso, val, date) => {
+    RateModel.upsertInterestRate({
+      country_iso: iso,
+      rate: val,
+      source: 'worldbank',
+      effective_date: date,
+    });
+  }, 'Interest Rates');
 }
 
 export async function fetchInflationRates(): Promise<void> {
-  try {
-    console.log('Fetching inflation rates from World Bank...');
-    
-    const countries = CountryModel.getAll();
-    let successCount = 0;
-    let errorCount = 0;
-
-    // World Bank API: Inflation indicator
-    // FP.CPI.TOTL.ZG = Inflation, consumer prices (annual %)
-    const batchSize = 10;
-    
-    for (let i = 0; i < countries.length; i += batchSize) {
-      const batch = countries.slice(i, i + batchSize);
-      
-      for (const country of batch) {
-        try {
-          const wbCode = getWorldBankCountryCode(country.iso_code);
-          const url = `${WORLD_BANK_API_URL}/country/${wbCode}/indicator/FP.CPI.TOTL.ZG?format=json&per_page=1`;
-          
-          const response = await axios.get(url);
-          const data = response.data;
-
-          if (data && data[1] && data[1].length > 0) {
-            const latest = data[1][0];
-            const rate = parseFloat(latest.value);
-
-            if (!isNaN(rate)) {
-              RateModel.upsertInflationRate({
-                country_iso: country.iso_code,
-                rate: rate,
-                period: 'yearly',
-                source: 'worldbank',
-                effective_date: latest.date || null,
-              });
-              successCount++;
-            }
-          }
-
-          // Rate limiting: small delay between requests
-          await new Promise(resolve => setTimeout(resolve, 100));
-        } catch (error) {
-          errorCount++;
-          console.warn(`Failed to fetch inflation rate for ${country.iso_code}:`, error);
-        }
-      }
-    }
-
-    console.log(`Inflation rates: ${successCount} successful, ${errorCount} errors`);
-  } catch (error) {
-    console.error('Error fetching inflation rates:', error);
-    throw error;
-  }
+  // FP.CPI.TOTL.ZG = Inflation, consumer prices (annual %)
+  await fetchIndicator('FP.CPI.TOTL.ZG', (iso, val, date) => {
+    RateModel.upsertInflationRate({
+      country_iso: iso,
+      rate: val,
+      period: 'yearly',
+      source: 'worldbank',
+      effective_date: date,
+    });
+  }, 'Inflation Rates');
 }
 
+export async function fetchGDPGrowthRates(): Promise<void> {
+  // NY.GDP.MKTP.KD.ZG = GDP growth (annual %)
+  await fetchIndicator('NY.GDP.MKTP.KD.ZG', (iso, val, date) => {
+    RateModel.upsertGDPGrowthRate({
+      country_iso: iso,
+      rate: val,
+      source: 'worldbank',
+      effective_date: date,
+    });
+  }, 'GDP Growth Rates');
+}
+
+export async function fetchUnemploymentRates(): Promise<void> {
+  // SL.UEM.TOTL.ZS = Unemployment, total (% of total labor force) (modeled ILO estimate)
+  await fetchIndicator('SL.UEM.TOTL.ZS', (iso, val, date) => {
+    RateModel.upsertUnemploymentRate({
+      country_iso: iso,
+      rate: val,
+      source: 'worldbank',
+      effective_date: date,
+    });
+  }, 'Unemployment Rates');
+}
