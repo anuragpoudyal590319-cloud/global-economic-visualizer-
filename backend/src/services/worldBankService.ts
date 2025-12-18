@@ -54,7 +54,33 @@ async function fetchIndicator(
           
           const url = `${WORLD_BANK_API_URL}/countries/all/indicators/${indicatorCode}?format=json&per_page=${perPage}&date=${dateRange}&page=${page}`;
           
-          const response = await axios.get(url, { timeout: 30000 });
+          // Increased timeout for World Bank API (some indicators take longer)
+          // Also add retry logic for timeouts
+          let response;
+          let retries = 3;
+          let lastError;
+          
+          while (retries > 0) {
+            try {
+              response = await axios.get(url, { timeout: 60000 }); // Increased to 60 seconds
+              break; // Success, exit retry loop
+            } catch (error: any) {
+              lastError = error;
+              if (error.code === 'ECONNABORTED' || error.message?.includes('timeout')) {
+                retries--;
+                if (retries > 0) {
+                  console.warn(`  ${rangeLabel} page ${page} timed out, retrying... (${retries} attempts left)`);
+                  await new Promise(resolve => setTimeout(resolve, 2000)); // Wait 2s before retry
+                  continue;
+                }
+              }
+              throw error; // Re-throw if not a timeout or retries exhausted
+            }
+          }
+          
+          if (!response) {
+            throw lastError || new Error('Request failed after retries');
+          }
           const data = response.data;
 
           if (!data || !Array.isArray(data) || data.length < 2 || !Array.isArray(data[1])) {
@@ -98,11 +124,28 @@ async function fetchIndicator(
           page++;
           await new Promise(resolve => setTimeout(resolve, 150)); // Reduced delay for efficiency
         } catch (error: any) {
+          // Handle timeout errors with retry
+          if (error.code === 'ECONNABORTED' || error.message?.includes('timeout')) {
+            console.warn(`  ${rangeLabel} page ${page} timed out, retrying...`);
+            await new Promise(resolve => setTimeout(resolve, 3000)); // Wait 3s before retry
+            continue; // Retry the same page
+          }
+          
+          // Handle 502 errors (bad gateway)
           if (error.response?.status === 502) {
             console.warn(`  ${rangeLabel} page ${page} returned 502, retrying...`);
             await new Promise(resolve => setTimeout(resolve, 2000));
             continue;
           }
+          
+          // Handle 503 errors (service unavailable)
+          if (error.response?.status === 503) {
+            console.warn(`  ${rangeLabel} page ${page} returned 503, retrying...`);
+            await new Promise(resolve => setTimeout(resolve, 3000));
+            continue;
+          }
+          
+          // For other errors, log and break
           console.error(`  Error fetching ${rangeLabel} page ${page}:`, error.message);
           break;
         }
