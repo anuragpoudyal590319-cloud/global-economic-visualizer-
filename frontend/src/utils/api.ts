@@ -4,10 +4,21 @@ import { Country, RateData } from '../types';
 // Default to 3001 (our backend dev server port)
 const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3001/api';
 
+// Log API URL in development to help debug
+if (import.meta.env.DEV) {
+  console.log('API URL:', API_URL);
+}
+
 export const api = {
   getCountries: async (): Promise<Country[]> => {
-    const response = await axios.get<Country[]>(`${API_URL}/countries`);
-    return response.data;
+    try {
+      const response = await axios.get<Country[]>(`${API_URL}/countries`);
+      return response.data;
+    } catch (error: any) {
+      console.error('Error fetching countries:', error);
+      console.error('API URL used:', `${API_URL}/countries`);
+      throw error;
+    }
   },
 
   getInterestRates: async (): Promise<RateData[]> => {

@@ -74,7 +74,8 @@ function App() {
       setError(null);
 
       try {
-        const [countriesResp, interest, inflation, exchange, gdp, unemployment, governmentDebt, gdpPerCapita, tradeBalance, currentAccount, fdi, populationGrowth, lifeExpectancy, giniCoefficient, exports] = await Promise.all([
+        // Use Promise.allSettled to handle partial failures gracefully
+        const results = await Promise.allSettled([
           api.getCountries(),
           api.getInterestRates(),
           api.getInflationRates(),
@@ -92,6 +93,47 @@ function App() {
           api.getExportsRates(),
         ]);
 
+        // Extract results, using empty arrays for failed requests
+        const endpointNames = [
+          'countries', 'interest', 'inflation', 'exchange', 'gdp',
+          'unemployment', 'government-debt', 'gdp-per-capita',
+          'trade-balance', 'current-account', 'fdi', 'population-growth',
+          'life-expectancy', 'gini-coefficient', 'exports'
+        ];
+
+        const countriesResp = results[0].status === 'fulfilled' 
+          ? results[0].value as Country[]
+          : (console.warn(`Failed to fetch ${endpointNames[0]}:`, results[0].reason), [] as Country[]);
+
+        const [
+          interest,
+          inflation,
+          exchange,
+          gdp,
+          unemployment,
+          governmentDebt,
+          gdpPerCapita,
+          tradeBalance,
+          currentAccount,
+          fdi,
+          populationGrowth,
+          lifeExpectancy,
+          giniCoefficient,
+          exports
+        ] = results.slice(1).map((result, index) => {
+          if (result.status === 'fulfilled') {
+            return result.value as RateData[];
+          } else {
+            console.warn(`Failed to fetch ${endpointNames[index + 1]}:`, result.reason);
+            return [] as RateData[];
+          }
+        });
+
+        // Check if at least countries loaded (critical)
+        if (countriesResp.length === 0) {
+          throw new Error('Failed to load countries. Please check your API connection.');
+        }
+
         setCountries(countriesResp);
         setInterestData(interest);
         setInflationData(inflation);
@@ -107,9 +149,9 @@ function App() {
         setLifeExpectancyData(lifeExpectancy);
         setGiniCoefficientData(giniCoefficient);
         setExportsData(exports);
-      } catch (err) {
+      } catch (err: any) {
         console.error('Error fetching data:', err);
-        setError('Failed to load data. Please ensure the backend is running.');
+        setError(err.message || 'Failed to load data. Please ensure the backend is running and check the browser console for details.');
       } finally {
         setLoading(false);
       }
