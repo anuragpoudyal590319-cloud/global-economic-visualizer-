@@ -52,70 +52,149 @@ router.post('/fetch-data', async (req, res) => {
         console.log('   Progress will be logged as each indicator completes.');
         
         try {
-          console.log('   Starting interest rates fetch...');
+          console.log('   [1/13] Starting interest rates fetch...');
+          const startTime = Date.now();
           await fetchInterestRates();
+          const duration = ((Date.now() - startTime) / 1000).toFixed(1);
           cache.del(cacheKeys.interestRates);
-          console.log('✅ Interest rates updated');
-        } catch (error) {
-          console.error('❌ Error fetching interest rates:', error);
+          console.log(`✅ [1/13] Interest rates updated (took ${duration}s)`);
+        } catch (error: any) {
+          console.error('❌ [1/13] Error fetching interest rates:', error?.message || error);
+          console.error('   Error details:', error);
           console.error('   Continuing with other indicators...');
         }
 
         try {
+          console.log('   [2/13] Starting inflation rates fetch...');
+          const startTime = Date.now();
           await fetchInflationRates();
+          const duration = ((Date.now() - startTime) / 1000).toFixed(1);
           cache.del(cacheKeys.inflationRates);
-          console.log('✅ Inflation rates updated');
-        } catch (error) {
-          console.error('❌ Error fetching inflation rates:', error);
+          console.log(`✅ [2/13] Inflation rates updated (took ${duration}s)`);
+        } catch (error: any) {
+          console.error('❌ [2/13] Error fetching inflation rates:', error?.message || error);
         }
 
         try {
+          console.log('   [3/13] Starting GDP growth fetch...');
+          const startTime = Date.now();
           await fetchGDPGrowthRates();
+          const duration = ((Date.now() - startTime) / 1000).toFixed(1);
           cache.del(cacheKeys.gdpGrowthRates);
-          console.log('✅ GDP growth updated');
-        } catch (error) {
-          console.error('❌ Error fetching GDP growth:', error);
+          console.log(`✅ [3/13] GDP growth updated (took ${duration}s)`);
+        } catch (error: any) {
+          console.error('❌ [3/13] Error fetching GDP growth:', error?.message || error);
         }
 
-        await fetchUnemploymentRates();
-        cache.del(cacheKeys.unemploymentRates);
-        console.log('✅ Unemployment rates updated');
+        try {
+          console.log('   [4/13] Starting unemployment rates fetch...');
+          const startTime = Date.now();
+          await fetchUnemploymentRates();
+          const duration = ((Date.now() - startTime) / 1000).toFixed(1);
+          cache.del(cacheKeys.unemploymentRates);
+          console.log(`✅ [4/13] Unemployment rates updated (took ${duration}s)`);
+        } catch (error: any) {
+          console.error('❌ [4/13] Error fetching unemployment rates:', error?.message || error);
+        }
 
-        await fetchGovernmentDebtRates();
-        cache.del(cacheKeys.governmentDebtRates);
-        console.log('✅ Government debt updated');
+        try {
+          console.log('   [5/13] Starting government debt fetch...');
+          const startTime = Date.now();
+          await fetchGovernmentDebtRates();
+          const duration = ((Date.now() - startTime) / 1000).toFixed(1);
+          cache.del(cacheKeys.governmentDebtRates);
+          console.log(`✅ [5/13] Government debt updated (took ${duration}s)`);
+        } catch (error: any) {
+          console.error('❌ [5/13] Error fetching government debt:', error?.message || error);
+        }
 
-        await fetchGDPPerCapitaRates();
-        cache.del(cacheKeys.gdpPerCapitaRates);
-        console.log('✅ GDP per capita updated');
+        try {
+          console.log('   [6/13] Starting GDP per capita fetch...');
+          const startTime = Date.now();
+          await fetchGDPPerCapitaRates();
+          const duration = ((Date.now() - startTime) / 1000).toFixed(1);
+          cache.del(cacheKeys.gdpPerCapitaRates);
+          console.log(`✅ [6/13] GDP per capita updated (took ${duration}s)`);
+        } catch (error: any) {
+          console.error('❌ [6/13] Error fetching GDP per capita:', error?.message || error);
+        }
 
-        await fetchTradeBalanceRates();
-        cache.del(cacheKeys.tradeBalanceRates);
-        console.log('✅ Trade balance updated');
+        try {
+          console.log('   [7/13] Starting trade balance fetch...');
+          const startTime = Date.now();
+          await fetchTradeBalanceRates();
+          const duration = ((Date.now() - startTime) / 1000).toFixed(1);
+          cache.del(cacheKeys.tradeBalanceRates);
+          console.log(`✅ [7/13] Trade balance updated (took ${duration}s)`);
+        } catch (error: any) {
+          console.error('❌ [7/13] Error fetching trade balance:', error?.message || error);
+        }
 
-        await fetchCurrentAccountRates();
-        cache.del(cacheKeys.currentAccountRates);
-        console.log('✅ Current account updated');
+        try {
+          console.log('   [8/13] Starting current account fetch...');
+          const startTime = Date.now();
+          await fetchCurrentAccountRates();
+          const duration = ((Date.now() - startTime) / 1000).toFixed(1);
+          cache.del(cacheKeys.currentAccountRates);
+          console.log(`✅ [8/13] Current account updated (took ${duration}s)`);
+        } catch (error: any) {
+          console.error('❌ [8/13] Error fetching current account:', error?.message || error);
+        }
 
-        await fetchFDIRates();
-        cache.del(cacheKeys.fdiRates);
-        console.log('✅ FDI updated');
+        try {
+          console.log('   [9/13] Starting FDI fetch...');
+          const startTime = Date.now();
+          await fetchFDIRates();
+          const duration = ((Date.now() - startTime) / 1000).toFixed(1);
+          cache.del(cacheKeys.fdiRates);
+          console.log(`✅ [9/13] FDI updated (took ${duration}s)`);
+        } catch (error: any) {
+          console.error('❌ [9/13] Error fetching FDI:', error?.message || error);
+        }
 
-        await fetchPopulationGrowthRates();
-        cache.del(cacheKeys.populationGrowthRates);
-        console.log('✅ Population growth updated');
+        try {
+          console.log('   [10/13] Starting population growth fetch...');
+          const startTime = Date.now();
+          await fetchPopulationGrowthRates();
+          const duration = ((Date.now() - startTime) / 1000).toFixed(1);
+          cache.del(cacheKeys.populationGrowthRates);
+          console.log(`✅ [10/13] Population growth updated (took ${duration}s)`);
+        } catch (error: any) {
+          console.error('❌ [10/13] Error fetching population growth:', error?.message || error);
+        }
 
-        await fetchLifeExpectancyRates();
-        cache.del(cacheKeys.lifeExpectancyRates);
-        console.log('✅ Life expectancy updated');
+        try {
+          console.log('   [11/13] Starting life expectancy fetch...');
+          const startTime = Date.now();
+          await fetchLifeExpectancyRates();
+          const duration = ((Date.now() - startTime) / 1000).toFixed(1);
+          cache.del(cacheKeys.lifeExpectancyRates);
+          console.log(`✅ [11/13] Life expectancy updated (took ${duration}s)`);
+        } catch (error: any) {
+          console.error('❌ [11/13] Error fetching life expectancy:', error?.message || error);
+        }
 
-        await fetchGiniCoefficientRates();
-        cache.del(cacheKeys.giniCoefficientRates);
-        console.log('✅ Gini coefficient updated');
+        try {
+          console.log('   [12/13] Starting Gini coefficient fetch...');
+          const startTime = Date.now();
+          await fetchGiniCoefficientRates();
+          const duration = ((Date.now() - startTime) / 1000).toFixed(1);
+          cache.del(cacheKeys.giniCoefficientRates);
+          console.log(`✅ [12/13] Gini coefficient updated (took ${duration}s)`);
+        } catch (error: any) {
+          console.error('❌ [12/13] Error fetching Gini coefficient:', error?.message || error);
+        }
 
-        await fetchExportsRates();
-        cache.del(cacheKeys.exportsRates);
-        console.log('✅ Exports updated');
+        try {
+          console.log('   [13/13] Starting exports fetch...');
+          const startTime = Date.now();
+          await fetchExportsRates();
+          const duration = ((Date.now() - startTime) / 1000).toFixed(1);
+          cache.del(cacheKeys.exportsRates);
+          console.log(`✅ [13/13] Exports updated (took ${duration}s)`);
+        } catch (error: any) {
+          console.error('❌ [13/13] Error fetching exports:', error?.message || error);
+        }
 
         console.log('✅ All data fetch complete!');
       } catch (error) {
