@@ -4,6 +4,15 @@ import { geminiLimiter } from '../utils/apiRateLimiter';
 const GEMINI_API_KEY = process.env.GEMINI_API_KEY || '';
 const client = GEMINI_API_KEY ? new GoogleGenAI({ apiKey: GEMINI_API_KEY }) : null;
 
+// Log API key status on startup (without exposing the key)
+if (!GEMINI_API_KEY) {
+  console.warn('⚠️  GEMINI_API_KEY is not set. AI analysis feature will not work.');
+  console.warn('   To enable AI analysis, set GEMINI_API_KEY in Railway environment variables.');
+  console.warn('   Get an API key from: https://aistudio.google.com/apikey');
+} else {
+  console.log('✅ GEMINI_API_KEY is configured. AI analysis is enabled.');
+}
+
 export interface CountryData {
   countryName: string;
   region?: string;

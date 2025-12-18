@@ -446,7 +446,17 @@ router.get('/analyze/:countryIso', aiLimiter, async (req, res) => {
     res.json({ analysis, cached: false });
   } catch (error: any) {
     console.error('Error generating AI analysis:', error);
-    res.status(500).json({ error: error.message || 'Failed to generate analysis' });
+    
+    // Provide more helpful error messages
+    let errorMessage = error.message || 'Failed to generate analysis';
+    
+    if (errorMessage.includes('Gemini API key not configured') || errorMessage.includes('GEMINI_API_KEY')) {
+      errorMessage = 'AI analysis is not configured. Please set GEMINI_API_KEY in Railway environment variables.';
+    } else if (errorMessage.includes('failed after retries')) {
+      errorMessage = 'AI analysis service is temporarily unavailable. Please try again later.';
+    }
+    
+    res.status(500).json({ error: errorMessage });
   }
 });
 
