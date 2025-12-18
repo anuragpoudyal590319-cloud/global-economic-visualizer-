@@ -106,7 +106,8 @@ async function callModelWithRetry(prompt: string): Promise<string> {
   }
 
   // Try pro first (more reliable), then flash
-  const models = ['gemini-2.5-pro', 'gemini-2.5-flash'];
+  // Updated model names for @google/genai v1.34.0
+  const models = ['gemini-1.5-pro', 'gemini-1.5-flash'];
   const maxAttempts = 4;
   const sleep = (ms: number) => new Promise(res => setTimeout(res, ms));
 
@@ -153,8 +154,13 @@ async function callModelWithRetry(prompt: string): Promise<string> {
       } catch (error: any) {
         const msg = error?.message || '';
         const code = error?.error?.code || error?.status || '';
-        // Retry on transient errors (503/500/overloaded)
-        if (attempt < maxAttempts && (/503/.test(String(code)) || /overloaded/i.test(msg) || /UNAVAILABLE/i.test(msg))) {
+        console.error(`Gemini API error (model: ${model}, attempt: ${attempt}):`, {
+          message: msg,
+          code,
+          error: error?.error || error
+        });
+        // Retry on transient errors (503/500/overloaded/429)
+        if (attempt < maxAttempts && (/503|500|429/.test(String(code)) || /overloaded|unavailable|rate.limit/i.test(msg) || /UNAVAILABLE/i.test(msg))) {
           await sleep(500 * attempt);
           continue;
         }
