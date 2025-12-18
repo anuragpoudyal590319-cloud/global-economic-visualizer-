@@ -102,12 +102,15 @@ Focus on data-driven insights using ONLY the provided indicators. Be specific ab
 
 async function callModelWithRetry(prompt: string): Promise<string> {
   if (!client) {
-    throw new Error('Gemini API key not configured. Please set GEMINI_API_KEY environment variable.');
+    console.error('GEMINI_API_KEY is not set in environment variables');
+    throw new Error('Gemini API key not configured. Please set GEMINI_API_KEY environment variable in Railway.');
   }
 
   // Try pro first (more reliable), then flash
   // Updated model names for @google/genai v1.34.0
   const models = ['gemini-1.5-pro', 'gemini-1.5-flash'];
+  
+  console.log(`Attempting AI analysis with models: ${models.join(', ')}`);
   const maxAttempts = 4;
   const sleep = (ms: number) => new Promise(res => setTimeout(res, ms));
 
@@ -117,10 +120,13 @@ async function callModelWithRetry(prompt: string): Promise<string> {
         // Wait for rate limiter before making API call
         await geminiLimiter.wait();
         
+        console.log(`Trying model: ${model}, attempt: ${attempt}`);
         const result = await client.models.generateContent({
           model,
           contents: [{ role: 'user', parts: [{ text: prompt }] }],
         });
+        
+        console.log(`Model ${model} response received, parsing...`);
 
         // Handle different response formats from Gemini API
         const resultAny = result as any;
