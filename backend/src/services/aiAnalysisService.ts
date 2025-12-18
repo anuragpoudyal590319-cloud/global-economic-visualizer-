@@ -172,13 +172,34 @@ async function callModelWithRetry(prompt: string): Promise<string> {
         console.error(`Gemini API error (model: ${model}, attempt: ${attempt}):`, {
           message: msg,
           code,
+          status: error?.response?.status || error?.status,
           error: error?.error || error
         });
-        // Retry on transient errors (503/500/overloaded/429)
-        if (attempt < maxAttempts && (/503|500|429/.test(String(code)) || /overloaded|unavailable|rate.limit/i.test(msg) || /UNAVAILABLE/i.test(msg))) {
-          await sleep(500 * attempt);
+        
+        const statusCode = error?.response?.status || error?.status || code;
+        const isRetryable = 
+          statusCode === 503 || // Service Unavailable
+          statusCode === 429 || // Too Many Requests
+          statusCode === 500 || // Internal Server Error
+          /503|500|429/.test(String(code)) ||
+          /overloaded|unavailable|rate.limit|quota|throttle/i.test(msg) ||
+          /UNAVAILABLE|SERVICE_UNAVAILABLE/i.test(msg);
+        
+        // Retry with exponential backoff for retryable errors
+        if (attempt < maxAttempts && isRetryable) {
+          // Exponential backoff: 2s, 4s, 8s, 16s
+          const backoffDelay = Math.min(2000 * Math.pow(2, attempt - 1), 16000);
+          console.warn(`  Retrying in ${backoffDelay}ms... (attempt ${attempt + 1}/${maxAttempts})`);
+          await sleep(backoffDelay);
           continue;
         }
+        
+        // If 429 (rate limit), wait longer before trying next model
+        if (statusCode === 429 && attempt === maxAttempts) {
+          console.warn(`  Rate limited. Waiting 10 seconds before trying next model...`);
+          await sleep(10000);
+        }
+        
         if (attempt === maxAttempts) {
           // move to next model
           break;
