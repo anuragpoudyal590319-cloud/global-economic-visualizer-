@@ -13,6 +13,10 @@ const app = express();
 const PORT = process.env.PORT || 3000;
 const CORS_ORIGIN = process.env.CORS_ORIGIN || 'http://localhost:5173';
 
+// Trust proxy (required for Railway and other hosting platforms)
+// This allows express-rate-limit to correctly identify client IPs
+app.set('trust proxy', true);
+
 // Middleware
 app.use(cors({
   origin: CORS_ORIGIN,
