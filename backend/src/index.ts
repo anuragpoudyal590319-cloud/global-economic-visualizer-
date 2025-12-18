@@ -6,6 +6,7 @@ import { seedCountries } from './services/countrySeedService';
 import routes from './routes';
 import { apiLimiter } from './middleware/rateLimiter';
 import './services/scheduler'; // Initialize cron jobs
+import { checkAndFetchDataOnStartup } from './services/startupDataCheck';
 
 dotenv.config();
 
@@ -40,6 +41,9 @@ if (countries.length === 0) {
 
 // Routes
 app.use('/api', routes);
+
+// Check and fetch data on startup if needed (runs in background)
+checkAndFetchDataOnStartup();
 
 // Error handling middleware
 app.use((err: Error, req: express.Request, res: express.Response, next: express.NextFunction) => {
