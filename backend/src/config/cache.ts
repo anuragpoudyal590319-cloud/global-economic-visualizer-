@@ -16,6 +16,15 @@ export const cacheKeys = {
   exchangeRates: 'rates:exchange',
   gdpGrowthRates: 'rates:gdp',
   unemploymentRates: 'rates:unemployment',
+  governmentDebtRates: 'rates:government-debt',
+  gdpPerCapitaRates: 'rates:gdp-per-capita',
+  tradeBalanceRates: 'rates:trade-balance',
+  currentAccountRates: 'rates:current-account',
+  fdiRates: 'rates:fdi',
+  populationGrowthRates: 'rates:population-growth',
+  lifeExpectancyRates: 'rates:life-expectancy',
+  giniCoefficientRates: 'rates:gini-coefficient',
+  exportsRates: 'rates:exports',
 };
 
 

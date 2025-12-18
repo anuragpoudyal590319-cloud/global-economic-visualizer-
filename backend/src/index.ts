@@ -4,6 +4,7 @@ import dotenv from 'dotenv';
 import { initializeDatabase } from './config/database';
 import { seedCountries } from './services/countrySeedService';
 import routes from './routes';
+import { apiLimiter } from './middleware/rateLimiter';
 import './services/scheduler'; // Initialize cron jobs
 
 dotenv.config();
@@ -18,6 +19,9 @@ app.use(cors({
   credentials: true,
 }));
 app.use(express.json());
+
+// Apply general rate limiting to all API routes
+app.use('/api', apiLimiter);
 
 // Initialize database
 initializeDatabase();

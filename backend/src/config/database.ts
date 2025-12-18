@@ -55,6 +55,78 @@ interface DatabaseData {
     effective_date?: string;
     updated_at: string;
   }>;
+  government_debt_rates: Array<{
+    id: number;
+    country_iso: string;
+    rate: number;
+    source?: string;
+    effective_date?: string;
+    updated_at: string;
+  }>;
+  gdp_per_capita_rates: Array<{
+    id: number;
+    country_iso: string;
+    rate: number;
+    source?: string;
+    effective_date?: string;
+    updated_at: string;
+  }>;
+  trade_balance_rates: Array<{
+    id: number;
+    country_iso: string;
+    rate: number;
+    source?: string;
+    effective_date?: string;
+    updated_at: string;
+  }>;
+  current_account_rates: Array<{
+    id: number;
+    country_iso: string;
+    rate: number;
+    source?: string;
+    effective_date?: string;
+    updated_at: string;
+  }>;
+  fdi_rates: Array<{
+    id: number;
+    country_iso: string;
+    rate: number;
+    source?: string;
+    effective_date?: string;
+    updated_at: string;
+  }>;
+  population_growth_rates: Array<{
+    id: number;
+    country_iso: string;
+    rate: number;
+    source?: string;
+    effective_date?: string;
+    updated_at: string;
+  }>;
+  life_expectancy_rates: Array<{
+    id: number;
+    country_iso: string;
+    rate: number;
+    source?: string;
+    effective_date?: string;
+    updated_at: string;
+  }>;
+  gini_coefficient_rates: Array<{
+    id: number;
+    country_iso: string;
+    rate: number;
+    source?: string;
+    effective_date?: string;
+    updated_at: string;
+  }>;
+  exports_rates: Array<{
+    id: number;
+    country_iso: string;
+    rate: number;
+    source?: string;
+    effective_date?: string;
+    updated_at: string;
+  }>;
 }
 
 const dbPath = process.env.DATABASE_PATH || path.join(__dirname, '../../data/economic_data.json');
@@ -73,6 +145,15 @@ const emptyDb: DatabaseData = {
   exchange_rates: [],
   gdp_growth_rates: [],
   unemployment_rates: [],
+  government_debt_rates: [],
+  gdp_per_capita_rates: [],
+  trade_balance_rates: [],
+  current_account_rates: [],
+  fdi_rates: [],
+  population_growth_rates: [],
+  life_expectancy_rates: [],
+  gini_coefficient_rates: [],
+  exports_rates: [],
 };
 
 // Load database from file
@@ -153,19 +234,20 @@ class Statement {
   }
 
   private runQuery(isWrite: boolean, ...params: any[]): any[] {
-    const sql = this.sql.trim().toUpperCase();
+    const sqlUpper = this.sql.trim().toUpperCase();
+    const sql = this.sql.trim();
     const data = this.data;
 
     // SELECT queries
-    if (sql.startsWith('SELECT')) {
-      if (sql.includes('FROM COUNTRIES')) {
+    if (sqlUpper.startsWith('SELECT')) {
+      if (sqlUpper.includes('FROM COUNTRIES')) {
         let results = [...data.countries];
         
-        if (sql.includes('WHERE ISO_CODE =')) {
+        if (sqlUpper.includes('WHERE ISO_CODE =')) {
           results = results.filter((r: any) => r.iso_code === params[0]);
         }
         
-        if (sql.includes('ORDER BY NAME')) {
+        if (sqlUpper.includes('ORDER BY NAME')) {
           results.sort((a: any, b: any) => a.name.localeCompare(b.name));
         }
         
@@ -180,18 +262,27 @@ class Statement {
         };
       }).sort((a: any, b: any) => new Date(b.effective_date || b.updated_at).getTime() - new Date(a.effective_date || a.updated_at).getTime());
 
-      if (sql.includes('FROM INTEREST_RATES')) return mapResults(data.interest_rates);
-      if (sql.includes('FROM INFLATION_RATES')) return mapResults(data.inflation_rates);
-      if (sql.includes('FROM EXCHANGE_RATES')) return mapResults(data.exchange_rates);
-      if (sql.includes('FROM GDP_GROWTH_RATES')) return mapResults(data.gdp_growth_rates);
-      if (sql.includes('FROM UNEMPLOYMENT_RATES')) return mapResults(data.unemployment_rates);
+      if (sqlUpper.includes('FROM INTEREST_RATES')) return mapResults(data.interest_rates);
+      if (sqlUpper.includes('FROM INFLATION_RATES')) return mapResults(data.inflation_rates);
+      if (sqlUpper.includes('FROM EXCHANGE_RATES')) return mapResults(data.exchange_rates);
+      if (sqlUpper.includes('FROM GDP_GROWTH_RATES')) return mapResults(data.gdp_growth_rates);
+      if (sqlUpper.includes('FROM UNEMPLOYMENT_RATES')) return mapResults(data.unemployment_rates);
+      if (sqlUpper.includes('FROM GOVERNMENT_DEBT_RATES')) return mapResults(data.government_debt_rates);
+      if (sqlUpper.includes('FROM GDP_PER_CAPITA_RATES')) return mapResults(data.gdp_per_capita_rates);
+      if (sqlUpper.includes('FROM TRADE_BALANCE_RATES')) return mapResults(data.trade_balance_rates);
+      if (sqlUpper.includes('FROM CURRENT_ACCOUNT_RATES')) return mapResults(data.current_account_rates);
+      if (sqlUpper.includes('FROM FDI_RATES')) return mapResults(data.fdi_rates);
+      if (sqlUpper.includes('FROM POPULATION_GROWTH_RATES')) return mapResults(data.population_growth_rates);
+      if (sqlUpper.includes('FROM LIFE_EXPECTANCY_RATES')) return mapResults(data.life_expectancy_rates);
+      if (sqlUpper.includes('FROM GINI_COEFFICIENT_RATES')) return mapResults(data.gini_coefficient_rates);
+      if (sqlUpper.includes('FROM EXPORTS_RATES')) return mapResults(data.exports_rates);
     }
 
     // INSERT queries
-    if (sql.startsWith('INSERT')) {
-      const ignoreConflict = sql.includes('INSERT OR IGNORE');
+    if (sqlUpper.startsWith('INSERT')) {
+      const ignoreConflict = sqlUpper.includes('INSERT OR IGNORE');
       
-      if (sql.includes('INTO COUNTRIES')) {
+      if (sqlUpper.includes('INTO COUNTRIES')) {
         const existing = data.countries.find((c: any) => c.iso_code === params[0]);
         if (existing && ignoreConflict) {
           return [];
@@ -216,7 +307,7 @@ class Statement {
         return [{ id }];
       }
       
-      if (sql.includes('INTO INTEREST_RATES')) {
+      if (sqlUpper.includes('INTO INTEREST_RATES')) {
         return this.upsertRate(data.interest_rates, 'country_iso', {
           country_iso: params[0],
           rate: params[1],
@@ -225,7 +316,7 @@ class Statement {
         }, isWrite);
       }
       
-      if (sql.includes('INTO INFLATION_RATES')) {
+      if (sqlUpper.includes('INTO INFLATION_RATES')) {
         return this.upsertRate(data.inflation_rates, 'country_iso', {
           country_iso: params[0],
           rate: params[1],
@@ -235,7 +326,7 @@ class Statement {
         }, isWrite);
       }
       
-      if (sql.includes('INTO EXCHANGE_RATES')) {
+      if (sqlUpper.includes('INTO EXCHANGE_RATES')) {
         return this.upsertExchangeRate(data.exchange_rates, {
           country_iso: params[0],
           currency_code: params[1],
@@ -245,7 +336,7 @@ class Statement {
         }, isWrite);
       }
 
-      if (sql.includes('INTO GDP_GROWTH_RATES')) {
+      if (sqlUpper.includes('INTO GDP_GROWTH_RATES')) {
         return this.upsertRate(data.gdp_growth_rates, 'country_iso', {
           country_iso: params[0],
           rate: params[1],
@@ -254,8 +345,89 @@ class Statement {
         }, isWrite);
       }
 
-      if (sql.includes('INTO UNEMPLOYMENT_RATES')) {
+      if (sqlUpper.includes('INTO UNEMPLOYMENT_RATES')) {
         return this.upsertRate(data.unemployment_rates, 'country_iso', {
+          country_iso: params[0],
+          rate: params[1],
+          source: params[2] || null,
+          effective_date: params[3] || null,
+        }, isWrite);
+      }
+
+      if (sqlUpper.includes('INTO GOVERNMENT_DEBT_RATES')) {
+        return this.upsertRate(data.government_debt_rates, 'country_iso', {
+          country_iso: params[0],
+          rate: params[1],
+          source: params[2] || null,
+          effective_date: params[3] || null,
+        }, isWrite);
+      }
+
+      if (sqlUpper.includes('INTO GDP_PER_CAPITA_RATES')) {
+        return this.upsertRate(data.gdp_per_capita_rates, 'country_iso', {
+          country_iso: params[0],
+          rate: params[1],
+          source: params[2] || null,
+          effective_date: params[3] || null,
+        }, isWrite);
+      }
+
+      if (sqlUpper.includes('INTO TRADE_BALANCE_RATES')) {
+        return this.upsertRate(data.trade_balance_rates, 'country_iso', {
+          country_iso: params[0],
+          rate: params[1],
+          source: params[2] || null,
+          effective_date: params[3] || null,
+        }, isWrite);
+      }
+
+      if (sqlUpper.includes('INTO CURRENT_ACCOUNT_RATES')) {
+        return this.upsertRate(data.current_account_rates, 'country_iso', {
+          country_iso: params[0],
+          rate: params[1],
+          source: params[2] || null,
+          effective_date: params[3] || null,
+        }, isWrite);
+      }
+
+      if (sqlUpper.includes('INTO FDI_RATES')) {
+        return this.upsertRate(data.fdi_rates, 'country_iso', {
+          country_iso: params[0],
+          rate: params[1],
+          source: params[2] || null,
+          effective_date: params[3] || null,
+        }, isWrite);
+      }
+
+      if (sqlUpper.includes('INTO POPULATION_GROWTH_RATES')) {
+        return this.upsertRate(data.population_growth_rates, 'country_iso', {
+          country_iso: params[0],
+          rate: params[1],
+          source: params[2] || null,
+          effective_date: params[3] || null,
+        }, isWrite);
+      }
+
+      if (sqlUpper.includes('INTO LIFE_EXPECTANCY_RATES')) {
+        return this.upsertRate(data.life_expectancy_rates, 'country_iso', {
+          country_iso: params[0],
+          rate: params[1],
+          source: params[2] || null,
+          effective_date: params[3] || null,
+        }, isWrite);
+      }
+
+      if (sqlUpper.includes('INTO GINI_COEFFICIENT_RATES')) {
+        return this.upsertRate(data.gini_coefficient_rates, 'country_iso', {
+          country_iso: params[0],
+          rate: params[1],
+          source: params[2] || null,
+          effective_date: params[3] || null,
+        }, isWrite);
+      }
+
+      if (sqlUpper.includes('INTO EXPORTS_RATES')) {
+        return this.upsertRate(data.exports_rates, 'country_iso', {
           country_iso: params[0],
           rate: params[1],
           source: params[2] || null,

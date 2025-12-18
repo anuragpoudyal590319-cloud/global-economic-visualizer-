@@ -342,10 +342,34 @@ export default function Map({ dataType, rateData, selectedIso, onSelectCountry }
 
       const typeLabel =
         safeDataType === 'interest'
-          ? 'Interest rate'
+          ? 'Real interest rate'
           : safeDataType === 'inflation'
             ? 'Inflation'
-            : 'Exchange rate (vs USD)';
+            : safeDataType === 'exchange'
+              ? 'Exchange rate (vs USD)'
+              : safeDataType === 'gdp'
+                ? 'GDP Growth'
+                : safeDataType === 'unemployment'
+                  ? 'Unemployment'
+                  : safeDataType === 'government-debt'
+                    ? 'Government Debt (% of GDP)'
+                    : safeDataType === 'gdp-per-capita'
+                      ? 'GDP Per Capita'
+                      : safeDataType === 'trade-balance'
+                        ? 'Trade Balance (% of GDP)'
+                        : safeDataType === 'current-account'
+                          ? 'Current Account (% of GDP)'
+                          : safeDataType === 'fdi'
+                            ? 'FDI (% of GDP)'
+                            : safeDataType === 'population-growth'
+                              ? 'Population Growth'
+                              : safeDataType === 'life-expectancy'
+                                ? 'Life Expectancy'
+                                : safeDataType === 'gini-coefficient'
+                                  ? 'Gini Coefficient'
+                                  : safeDataType === 'exports'
+                                    ? 'Exports (% of GDP)'
+                                    : 'Rate';
 
       const formatValue = (value: number) => legendScale.format(value);
 
@@ -553,9 +577,10 @@ export default function Map({ dataType, rateData, selectedIso, onSelectCountry }
 
       if (!bounds.isEmpty()) {
         map.current.fitBounds(bounds, {
-          padding: { top: 40, bottom: 40, left: 40, right: 40 },
+          padding: { top: 100, bottom: 100, left: 100, right: 100 },
           duration: 700,
-          maxZoom: 4,
+          maxZoom: 2.5,
+          minZoom: 1.5,
         });
       }
     };
@@ -567,10 +592,34 @@ export default function Map({ dataType, rateData, selectedIso, onSelectCountry }
 
   const legendTitle =
     safeDataType === 'interest'
-      ? 'Interest rate'
+      ? 'Real interest rate'
       : safeDataType === 'inflation'
         ? 'Inflation'
-        : 'Exchange rate (vs USD)';
+        : safeDataType === 'exchange'
+          ? 'Exchange rate (vs USD)'
+          : safeDataType === 'gdp'
+            ? 'GDP Growth'
+            : safeDataType === 'unemployment'
+              ? 'Unemployment'
+              : safeDataType === 'government-debt'
+                ? 'Government Debt (% of GDP)'
+                : safeDataType === 'gdp-per-capita'
+                  ? 'GDP Per Capita (USD)'
+                  : safeDataType === 'trade-balance'
+                    ? 'Trade Balance (% of GDP)'
+                    : safeDataType === 'current-account'
+                      ? 'Current Account (% of GDP)'
+                      : safeDataType === 'fdi'
+                        ? 'FDI (% of GDP)'
+                        : safeDataType === 'population-growth'
+                          ? 'Population Growth (%)'
+                          : safeDataType === 'life-expectancy'
+                            ? 'Life Expectancy (years)'
+                            : safeDataType === 'gini-coefficient'
+                              ? 'Gini Coefficient'
+                              : safeDataType === 'exports'
+                                ? 'Exports (% of GDP)'
+                                : 'Rate';
 
   return (
     <div style={{ position: 'relative', width: '100%', height: '100%' }}>

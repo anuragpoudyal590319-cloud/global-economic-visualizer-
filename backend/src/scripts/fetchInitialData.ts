@@ -70,12 +70,111 @@ async function main() {
     console.error('❌ Error fetching Unemployment rates:', error);
   }
 
+  // Fetch Government Debt
+  console.log('🏛️ Fetching Government Debt rates...');
+  try {
+    const { fetchGovernmentDebtRates } = await import('../services/worldBankService');
+    await fetchGovernmentDebtRates();
+    console.log('✅ Government Debt rates fetched\n');
+  } catch (error) {
+    console.error('❌ Error fetching Government Debt rates:', error);
+  }
+
+  // Fetch GDP Per Capita
+  console.log('💰 Fetching GDP Per Capita rates...');
+  try {
+    const { fetchGDPPerCapitaRates } = await import('../services/worldBankService');
+    await fetchGDPPerCapitaRates();
+    console.log('✅ GDP Per Capita rates fetched\n');
+  } catch (error) {
+    console.error('❌ Error fetching GDP Per Capita rates:', error);
+  }
+
+  // Fetch Trade Balance
+  console.log('📦 Fetching Trade Balance rates...');
+  try {
+    const { fetchTradeBalanceRates } = await import('../services/worldBankService');
+    await fetchTradeBalanceRates();
+    console.log('✅ Trade Balance rates fetched\n');
+  } catch (error) {
+    console.error('❌ Error fetching Trade Balance rates:', error);
+  }
+
+  // Fetch Current Account
+  console.log('💳 Fetching Current Account rates...');
+  try {
+    const { fetchCurrentAccountRates } = await import('../services/worldBankService');
+    await fetchCurrentAccountRates();
+    console.log('✅ Current Account rates fetched\n');
+  } catch (error) {
+    console.error('❌ Error fetching Current Account rates:', error);
+  }
+
+  // Fetch FDI
+  console.log('🌍 Fetching FDI rates...');
+  try {
+    const { fetchFDIRates } = await import('../services/worldBankService');
+    await fetchFDIRates();
+    console.log('✅ FDI rates fetched\n');
+  } catch (error) {
+    console.error('❌ Error fetching FDI rates:', error);
+  }
+
+  // Fetch Population Growth
+  console.log('👥 Fetching Population Growth rates...');
+  try {
+    const { fetchPopulationGrowthRates } = await import('../services/worldBankService');
+    await fetchPopulationGrowthRates();
+    console.log('✅ Population Growth rates fetched\n');
+  } catch (error) {
+    console.error('❌ Error fetching Population Growth rates:', error);
+  }
+
+  // Fetch Life Expectancy
+  console.log('❤️ Fetching Life Expectancy rates...');
+  try {
+    const { fetchLifeExpectancyRates } = await import('../services/worldBankService');
+    await fetchLifeExpectancyRates();
+    console.log('✅ Life Expectancy rates fetched\n');
+  } catch (error) {
+    console.error('❌ Error fetching Life Expectancy rates:', error);
+  }
+
+  // Fetch Gini Coefficient
+  console.log('📊 Fetching Gini Coefficient rates...');
+  try {
+    const { fetchGiniCoefficientRates } = await import('../services/worldBankService');
+    await fetchGiniCoefficientRates();
+    console.log('✅ Gini Coefficient rates fetched\n');
+  } catch (error) {
+    console.error('❌ Error fetching Gini Coefficient rates:', error);
+  }
+
+  // Fetch Exports
+  console.log('📦 Fetching Exports rates...');
+  try {
+    const { fetchExportsRates } = await import('../services/worldBankService');
+    await fetchExportsRates();
+    console.log('✅ Exports rates fetched\n');
+  } catch (error) {
+    console.error('❌ Error fetching Exports rates:', error);
+  }
+
   // Summary
   const exchangeCount = (db as any).data.exchange_rates?.length || 0;
   const interestCount = (db as any).data.interest_rates?.length || 0;
   const inflationCount = (db as any).data.inflation_rates?.length || 0;
   const gdpCount = (db as any).data.gdp_growth_rates?.length || 0;
   const unemploymentCount = (db as any).data.unemployment_rates?.length || 0;
+  const governmentDebtCount = (db as any).data.government_debt_rates?.length || 0;
+  const gdpPerCapitaCount = (db as any).data.gdp_per_capita_rates?.length || 0;
+  const tradeBalanceCount = (db as any).data.trade_balance_rates?.length || 0;
+  const currentAccountCount = (db as any).data.current_account_rates?.length || 0;
+  const fdiCount = (db as any).data.fdi_rates?.length || 0;
+  const populationGrowthCount = (db as any).data.population_growth_rates?.length || 0;
+  const lifeExpectancyCount = (db as any).data.life_expectancy_rates?.length || 0;
+  const giniCoefficientCount = (db as any).data.gini_coefficient_rates?.length || 0;
+  const exportsCount = (db as any).data.exports_rates?.length || 0;
 
   console.log('📊 Data Summary:');
   console.log(`   Countries: ${countries.length}`);
@@ -84,6 +183,15 @@ async function main() {
   console.log(`   Inflation Rates: ${inflationCount}`);
   console.log(`   GDP Growth Rates: ${gdpCount}`);
   console.log(`   Unemployment Rates: ${unemploymentCount}`);
+  console.log(`   Government Debt Rates: ${governmentDebtCount}`);
+  console.log(`   GDP Per Capita Rates: ${gdpPerCapitaCount}`);
+  console.log(`   Trade Balance Rates: ${tradeBalanceCount}`);
+  console.log(`   Current Account Rates: ${currentAccountCount}`);
+  console.log(`   FDI Rates: ${fdiCount}`);
+  console.log(`   Population Growth Rates: ${populationGrowthCount}`);
+  console.log(`   Life Expectancy Rates: ${lifeExpectancyCount}`);
+  console.log(`   Gini Coefficient Rates: ${giniCoefficientCount}`);
+  console.log(`   Exports Rates: ${exportsCount}`);
   console.log('\n✅ Initial data fetch complete!');
   console.log('🌐 Refresh your browser to see the data on the map!');
 

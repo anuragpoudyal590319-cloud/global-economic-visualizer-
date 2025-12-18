@@ -2,6 +2,7 @@ import axios from 'axios';
 import { RateModel } from '../models/Rate';
 import { CountryModel } from '../models/Country';
 import { getCountriesByCurrency } from '../utils/countryCurrencyMap';
+import { exchangeRateLimiter } from '../utils/apiRateLimiter';
 
 // Using ER API (free, no key required for basic usage)
 // https://open.er-api.com/v6/latest/USD
@@ -17,6 +18,9 @@ export interface ExchangeRateResponse {
 export async function fetchExchangeRates(): Promise<void> {
   try {
     console.log('Fetching exchange rates...');
+    
+    // Wait for rate limiter before making API call
+    await exchangeRateLimiter.wait();
     
     const response = await axios.get<ExchangeRateResponse>(EXCHANGE_API_URL);
 

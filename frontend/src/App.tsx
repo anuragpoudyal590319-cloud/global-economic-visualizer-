@@ -1,7 +1,8 @@
 import { useEffect, useMemo, useState } from 'react';
-import Map from './components/Map';
+import LazyMap from './components/LazyMap';
 import HistoryChart from './components/HistoryChart';
-import { Country, RateData } from './types';
+import AIAnalysis from './components/AIAnalysis';
+import { Country, RateData, DataType } from './types';
 import { api } from './utils/api';
 import './App.css';
 
@@ -14,6 +15,15 @@ function App() {
   const [exchangeData, setExchangeData] = useState<RateData[]>([]);
   const [gdpData, setGdpData] = useState<RateData[]>([]);
   const [unemploymentData, setUnemploymentData] = useState<RateData[]>([]);
+  const [governmentDebtData, setGovernmentDebtData] = useState<RateData[]>([]);
+  const [gdpPerCapitaData, setGdpPerCapitaData] = useState<RateData[]>([]);
+  const [tradeBalanceData, setTradeBalanceData] = useState<RateData[]>([]);
+  const [currentAccountData, setCurrentAccountData] = useState<RateData[]>([]);
+  const [fdiData, setFdiData] = useState<RateData[]>([]);
+  const [populationGrowthData, setPopulationGrowthData] = useState<RateData[]>([]);
+  const [lifeExpectancyData, setLifeExpectancyData] = useState<RateData[]>([]);
+  const [giniCoefficientData, setGiniCoefficientData] = useState<RateData[]>([]);
+  const [exportsData, setExportsData] = useState<RateData[]>([]);
 
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -45,8 +55,17 @@ function App() {
       exchange: build(exchangeData),
       gdp: build(gdpData),
       unemployment: build(unemploymentData),
+      'government-debt': build(governmentDebtData),
+      'gdp-per-capita': build(gdpPerCapitaData),
+      'trade-balance': build(tradeBalanceData),
+      'current-account': build(currentAccountData),
+      'fdi': build(fdiData),
+      'population-growth': build(populationGrowthData),
+      'life-expectancy': build(lifeExpectancyData),
+      'gini-coefficient': build(giniCoefficientData),
+      'exports': build(exportsData),
     };
-  }, [interestData, inflationData, exchangeData, gdpData, unemploymentData]);
+  }, [interestData, inflationData, exchangeData, gdpData, unemploymentData, governmentDebtData, gdpPerCapitaData, tradeBalanceData, currentAccountData, fdiData, populationGrowthData, lifeExpectancyData, giniCoefficientData, exportsData]);
 
   // Initial Data Fetch
   useEffect(() => {
@@ -55,13 +74,22 @@ function App() {
       setError(null);
 
       try {
-        const [countriesResp, interest, inflation, exchange, gdp, unemployment] = await Promise.all([
+        const [countriesResp, interest, inflation, exchange, gdp, unemployment, governmentDebt, gdpPerCapita, tradeBalance, currentAccount, fdi, populationGrowth, lifeExpectancy, giniCoefficient, exports] = await Promise.all([
           api.getCountries(),
           api.getInterestRates(),
           api.getInflationRates(),
           api.getExchangeRates(),
           api.getGDPGrowthRates(),
           api.getUnemploymentRates(),
+          api.getGovernmentDebtRates(),
+          api.getGDPPerCapitaRates(),
+          api.getTradeBalanceRates(),
+          api.getCurrentAccountRates(),
+          api.getFDIRates(),
+          api.getPopulationGrowthRates(),
+          api.getLifeExpectancyRates(),
+          api.getGiniCoefficientRates(),
+          api.getExportsRates(),
         ]);
 
         setCountries(countriesResp);
@@ -70,6 +98,15 @@ function App() {
         setExchangeData(exchange);
         setGdpData(gdp);
         setUnemploymentData(unemployment);
+        setGovernmentDebtData(governmentDebt);
+        setGdpPerCapitaData(gdpPerCapita);
+        setTradeBalanceData(tradeBalance);
+        setCurrentAccountData(currentAccount);
+        setFdiData(fdi);
+        setPopulationGrowthData(populationGrowth);
+        setLifeExpectancyData(lifeExpectancy);
+        setGiniCoefficientData(giniCoefficient);
+        setExportsData(exports);
       } catch (err) {
         console.error('Error fetching data:', err);
         setError('Failed to load data. Please ensure the backend is running.');
@@ -90,12 +127,21 @@ function App() {
       try {
         const iso = selectedIso;
         // Fetch all history in parallel
-        const [int, inf, ex, gdp, unemp] = await Promise.all([
+        const [int, inf, ex, gdp, unemp, govDebt, gdpPC, trade, currentAcc, fdi, popGrowth, lifeExp, gini, exports] = await Promise.all([
           api.getHistoricalRates(iso, 'interest'),
           api.getHistoricalRates(iso, 'inflation'),
           api.getHistoricalRates(iso, 'exchange'),
           api.getHistoricalRates(iso, 'gdp'),
           api.getHistoricalRates(iso, 'unemployment'),
+          api.getHistoricalRates(iso, 'government-debt'),
+          api.getHistoricalRates(iso, 'gdp-per-capita'),
+          api.getHistoricalRates(iso, 'trade-balance'),
+          api.getHistoricalRates(iso, 'current-account'),
+          api.getHistoricalRates(iso, 'fdi'),
+          api.getHistoricalRates(iso, 'population-growth'),
+          api.getHistoricalRates(iso, 'life-expectancy'),
+          api.getHistoricalRates(iso, 'gini-coefficient'),
+          api.getHistoricalRates(iso, 'exports'),
         ]);
 
         setHistory({
@@ -104,6 +150,15 @@ function App() {
           exchange: ex,
           gdp,
           unemployment: unemp,
+          'government-debt': govDebt,
+          'gdp-per-capita': gdpPC,
+          'trade-balance': trade,
+          'current-account': currentAcc,
+          'fdi': fdi,
+          'population-growth': popGrowth,
+          'life-expectancy': lifeExp,
+          'gini-coefficient': gini,
+          'exports': exports,
         });
       } catch (e) {
         console.error('Failed to fetch history', e);
@@ -153,10 +208,22 @@ function App() {
   const selectedExchange = selectedIso ? ratesByIso.exchange.get(selectedIso) : undefined;
   const selectedGdp = selectedIso ? ratesByIso.gdp.get(selectedIso) : undefined;
   const selectedUnemployment = selectedIso ? ratesByIso.unemployment.get(selectedIso) : undefined;
+  const selectedGovernmentDebt = selectedIso ? ratesByIso['government-debt'].get(selectedIso) : undefined;
+  const selectedGdpPerCapita = selectedIso ? ratesByIso['gdp-per-capita'].get(selectedIso) : undefined;
+  const selectedTradeBalance = selectedIso ? ratesByIso['trade-balance'].get(selectedIso) : undefined;
+  const selectedCurrentAccount = selectedIso ? ratesByIso['current-account'].get(selectedIso) : undefined;
+  const selectedFDI = selectedIso ? ratesByIso['fdi'].get(selectedIso) : undefined;
+  const selectedPopulationGrowth = selectedIso ? ratesByIso['population-growth'].get(selectedIso) : undefined;
+  const selectedLifeExpectancy = selectedIso ? ratesByIso['life-expectancy'].get(selectedIso) : undefined;
+  const selectedGiniCoefficient = selectedIso ? ratesByIso['gini-coefficient'].get(selectedIso) : undefined;
+  const selectedExports = selectedIso ? ratesByIso['exports'].get(selectedIso) : undefined;
 
-  const formatValue = (type: 'interest' | 'inflation' | 'exchange' | 'gdp' | 'unemployment', v?: number) => {
+  const formatValue = (type: DataType, v?: number) => {
     if (v === null || v === undefined || Number.isNaN(v)) return '—';
     if (type === 'exchange') return v.toFixed(4);
+    if (type === 'gdp-per-capita') return `$${v.toLocaleString('en-US', { maximumFractionDigits: 0 })}`;
+    if (type === 'life-expectancy') return `${v.toFixed(1)} years`;
+    if (type === 'gini-coefficient') return v.toFixed(2);
     return `${v.toFixed(2)}%`;
   };
 
@@ -165,7 +232,7 @@ function App() {
       <header className="header">
         <div className="header-content">
           <div>
-            <h1>Economic Data World Map</h1>
+            <h1>Global Economic Visualizer</h1>
             <p className="subtitle">Explore global economic indicators and historical trends</p>
           </div>
           <div className="header-right">
@@ -185,11 +252,6 @@ function App() {
               <button className="search-button" type="submit">Go</button>
             </form>
 
-            <div className="header-badges">
-              <span className="badge">Fast</span>
-              <span className="badge">Free</span>
-              <span className="badge">Live</span>
-            </div>
           </div>
         </div>
       </header>
@@ -212,13 +274,14 @@ function App() {
           <>
             {/* Row 1: Original Metircs */}
             <div className="map-panel">
-              <div className="map-panel-title">Interest Rates</div>
+              <div className="map-panel-title">Real Interest Rates</div>
               <div className="map-panel-canvas">
-                <Map
+                <LazyMap
                   dataType="interest"
                   rateData={interestData}
                   selectedIso={selectedIso}
                   onSelectCountry={openCountry}
+                  title="Real Interest Rates"
                 />
               </div>
             </div>
@@ -226,11 +289,12 @@ function App() {
             <div className="map-panel">
               <div className="map-panel-title">Inflation Rates</div>
               <div className="map-panel-canvas">
-                <Map
+                <LazyMap
                   dataType="inflation"
                   rateData={inflationData}
                   selectedIso={selectedIso}
                   onSelectCountry={openCountry}
+                  title="Inflation Rates"
                 />
               </div>
             </div>
@@ -238,11 +302,12 @@ function App() {
             <div className="map-panel">
               <div className="map-panel-title">Exchange (vs USD)</div>
               <div className="map-panel-canvas">
-                <Map
+                <LazyMap
                   dataType="exchange"
                   rateData={exchangeData}
                   selectedIso={selectedIso}
                   onSelectCountry={openCountry}
+                  title="Exchange Rates"
                 />
               </div>
             </div>
@@ -251,11 +316,12 @@ function App() {
             <div className="map-panel">
               <div className="map-panel-title">GDP Growth</div>
               <div className="map-panel-canvas">
-                <Map
+                <LazyMap
                   dataType="gdp"
                   rateData={gdpData}
                   selectedIso={selectedIso}
                   onSelectCountry={openCountry}
+                  title="GDP Growth"
                 />
               </div>
             </div>
@@ -263,20 +329,132 @@ function App() {
             <div className="map-panel">
               <div className="map-panel-title">Unemployment</div>
               <div className="map-panel-canvas">
-                <Map
+                <LazyMap
                   dataType="unemployment"
                   rateData={unemploymentData}
                   selectedIso={selectedIso}
                   onSelectCountry={openCountry}
+                  title="Unemployment"
                 />
               </div>
             </div>
 
-            {/* Placeholder for symmetry or future metric */}
-            <div className="map-panel" style={{ background: '#f8fafc', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-              <div style={{ textAlign: 'center', color: '#94a3b8' }}>
-                <div style={{ fontSize: '24px', marginBottom: '8px' }}>🚀</div>
-                <div>More metrics coming soon</div>
+            <div className="map-panel">
+              <div className="map-panel-title">Government Debt (% of GDP)</div>
+              <div className="map-panel-canvas">
+                <LazyMap
+                  dataType="government-debt"
+                  rateData={governmentDebtData}
+                  selectedIso={selectedIso}
+                  onSelectCountry={openCountry}
+                  title="Government Debt"
+                />
+              </div>
+            </div>
+
+            {/* Row 3: High Priority New Metrics */}
+            <div className="map-panel">
+              <div className="map-panel-title">GDP Per Capita</div>
+              <div className="map-panel-canvas">
+                <LazyMap
+                  dataType="gdp-per-capita"
+                  rateData={gdpPerCapitaData}
+                  selectedIso={selectedIso}
+                  onSelectCountry={openCountry}
+                  title="GDP Per Capita"
+                />
+              </div>
+            </div>
+
+            <div className="map-panel">
+              <div className="map-panel-title">Trade Balance (% of GDP)</div>
+              <div className="map-panel-canvas">
+                <LazyMap
+                  dataType="trade-balance"
+                  rateData={tradeBalanceData}
+                  selectedIso={selectedIso}
+                  onSelectCountry={openCountry}
+                  title="Trade Balance"
+                />
+              </div>
+            </div>
+
+            <div className="map-panel">
+              <div className="map-panel-title">Current Account (% of GDP)</div>
+              <div className="map-panel-canvas">
+                <LazyMap
+                  dataType="current-account"
+                  rateData={currentAccountData}
+                  selectedIso={selectedIso}
+                  onSelectCountry={openCountry}
+                  title="Current Account"
+                />
+              </div>
+            </div>
+
+            <div className="map-panel">
+              <div className="map-panel-title">FDI (% of GDP)</div>
+              <div className="map-panel-canvas">
+                <LazyMap
+                  dataType="fdi"
+                  rateData={fdiData}
+                  selectedIso={selectedIso}
+                  onSelectCountry={openCountry}
+                  title="FDI"
+                />
+              </div>
+            </div>
+
+            {/* Row 4: Additional Metrics */}
+            <div className="map-panel">
+              <div className="map-panel-title">Population Growth</div>
+              <div className="map-panel-canvas">
+                <LazyMap
+                  dataType="population-growth"
+                  rateData={populationGrowthData}
+                  selectedIso={selectedIso}
+                  onSelectCountry={openCountry}
+                  title="Population Growth"
+                />
+              </div>
+            </div>
+
+            <div className="map-panel">
+              <div className="map-panel-title">Life Expectancy</div>
+              <div className="map-panel-canvas">
+                <LazyMap
+                  dataType="life-expectancy"
+                  rateData={lifeExpectancyData}
+                  selectedIso={selectedIso}
+                  onSelectCountry={openCountry}
+                  title="Life Expectancy"
+                />
+              </div>
+            </div>
+
+            <div className="map-panel">
+              <div className="map-panel-title">Gini Coefficient</div>
+              <div className="map-panel-canvas">
+                <LazyMap
+                  dataType="gini-coefficient"
+                  rateData={giniCoefficientData}
+                  selectedIso={selectedIso}
+                  onSelectCountry={openCountry}
+                  title="Gini Coefficient"
+                />
+              </div>
+            </div>
+
+            <div className="map-panel">
+              <div className="map-panel-title">Exports (% of GDP)</div>
+              <div className="map-panel-canvas">
+                <LazyMap
+                  dataType="exports"
+                  rateData={exportsData}
+                  selectedIso={selectedIso}
+                  onSelectCountry={openCountry}
+                  title="Exports"
+                />
               </div>
             </div>
           </>
@@ -300,11 +478,17 @@ function App() {
         </div>
 
         <div className="drawer-body">
+          <AIAnalysis
+            countryIso={selectedIso || ''}
+            countryName={selectedCountry?.name || selectedIso || ''}
+            autoGenerate={false}
+          />
+
           <div className="drawer-section-title">Current Indicators</div>
 
           {/* Metric Rows */}
           <div className="metric-row">
-            <div className="metric-name">Interest Rate</div>
+            <div className="metric-name">Real Interest Rate</div>
             <div className="metric-value">{formatValue('interest', selectedInterest?.value)}</div>
           </div>
           <div className="metric-row">
@@ -323,12 +507,48 @@ function App() {
             <div className="metric-name">Unemployment</div>
             <div className="metric-value">{formatValue('unemployment', selectedUnemployment?.value)}</div>
           </div>
+          <div className="metric-row">
+            <div className="metric-name">Government Debt (% of GDP)</div>
+            <div className="metric-value">{formatValue('government-debt', selectedGovernmentDebt?.value)}</div>
+          </div>
+          <div className="metric-row">
+            <div className="metric-name">GDP Per Capita</div>
+            <div className="metric-value">{formatValue('gdp-per-capita', selectedGdpPerCapita?.value)}</div>
+          </div>
+          <div className="metric-row">
+            <div className="metric-name">Trade Balance (% of GDP)</div>
+            <div className="metric-value">{formatValue('trade-balance', selectedTradeBalance?.value)}</div>
+          </div>
+          <div className="metric-row">
+            <div className="metric-name">Current Account (% of GDP)</div>
+            <div className="metric-value">{formatValue('current-account', selectedCurrentAccount?.value)}</div>
+          </div>
+          <div className="metric-row">
+            <div className="metric-name">FDI (% of GDP)</div>
+            <div className="metric-value">{formatValue('fdi', selectedFDI?.value)}</div>
+          </div>
+          <div className="metric-row">
+            <div className="metric-name">Population Growth</div>
+            <div className="metric-value">{formatValue('population-growth', selectedPopulationGrowth?.value)}</div>
+          </div>
+          <div className="metric-row">
+            <div className="metric-name">Life Expectancy</div>
+            <div className="metric-value">{formatValue('life-expectancy', selectedLifeExpectancy?.value)}</div>
+          </div>
+          <div className="metric-row">
+            <div className="metric-name">Gini Coefficient</div>
+            <div className="metric-value">{formatValue('gini-coefficient', selectedGiniCoefficient?.value)}</div>
+          </div>
+          <div className="metric-row">
+            <div className="metric-name">Exports (% of GDP)</div>
+            <div className="metric-value">{formatValue('exports', selectedExports?.value)}</div>
+          </div>
 
           <div className="drawer-section-title" style={{ marginTop: '24px' }}>Historical Trends</div>
 
           <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
             <div>
-              <div style={{ fontSize: '13px', fontWeight: 600, marginBottom: '8px' }}>Interest Rate History</div>
+              <div style={{ fontSize: '13px', fontWeight: 600, marginBottom: '8px' }}>Real Interest Rate History</div>
               <HistoryChart
                 data={history.interest}
                 type="interest"
@@ -363,6 +583,96 @@ function App() {
                 data={history.unemployment}
                 type="unemployment"
                 color="#f44336"
+                loading={loadingHistory}
+              />
+            </div>
+
+            <div>
+              <div style={{ fontSize: '13px', fontWeight: 600, marginBottom: '8px' }}>Government Debt History</div>
+              <HistoryChart
+                data={history['government-debt']}
+                type="government-debt"
+                color="#9c27b0"
+                loading={loadingHistory}
+              />
+            </div>
+
+            <div>
+              <div style={{ fontSize: '13px', fontWeight: 600, marginBottom: '8px' }}>GDP Per Capita History</div>
+              <HistoryChart
+                data={history['gdp-per-capita']}
+                type="gdp-per-capita"
+                color="#ff9800"
+                loading={loadingHistory}
+              />
+            </div>
+
+            <div>
+              <div style={{ fontSize: '13px', fontWeight: 600, marginBottom: '8px' }}>Trade Balance History</div>
+              <HistoryChart
+                data={history['trade-balance']}
+                type="trade-balance"
+                color="#2196f3"
+                loading={loadingHistory}
+              />
+            </div>
+
+            <div>
+              <div style={{ fontSize: '13px', fontWeight: 600, marginBottom: '8px' }}>Current Account History</div>
+              <HistoryChart
+                data={history['current-account']}
+                type="current-account"
+                color="#00bcd4"
+                loading={loadingHistory}
+              />
+            </div>
+
+            <div>
+              <div style={{ fontSize: '13px', fontWeight: 600, marginBottom: '8px' }}>FDI History</div>
+              <HistoryChart
+                data={history['fdi']}
+                type="fdi"
+                color="#4caf50"
+                loading={loadingHistory}
+              />
+            </div>
+
+            <div>
+              <div style={{ fontSize: '13px', fontWeight: 600, marginBottom: '8px' }}>Population Growth History</div>
+              <HistoryChart
+                data={history['population-growth']}
+                type="population-growth"
+                color="#4292c6"
+                loading={loadingHistory}
+              />
+            </div>
+
+            <div>
+              <div style={{ fontSize: '13px', fontWeight: 600, marginBottom: '8px' }}>Life Expectancy History</div>
+              <HistoryChart
+                data={history['life-expectancy']}
+                type="life-expectancy"
+                color="#4caf50"
+                loading={loadingHistory}
+              />
+            </div>
+
+            <div>
+              <div style={{ fontSize: '13px', fontWeight: 600, marginBottom: '8px' }}>Gini Coefficient History</div>
+              <HistoryChart
+                data={history['gini-coefficient']}
+                type="gini-coefficient"
+                color="#ef3b2c"
+                loading={loadingHistory}
+              />
+            </div>
+
+            <div>
+              <div style={{ fontSize: '13px', fontWeight: 600, marginBottom: '8px' }}>Exports History</div>
+              <HistoryChart
+                data={history['exports']}
+                type="exports"
+                color="#2171b5"
                 loading={loadingHistory}
               />
             </div>

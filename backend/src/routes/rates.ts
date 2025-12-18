@@ -3,8 +3,14 @@ import { RateModel } from '../models/Rate';
 import { CountryModel } from '../models/Country';
 import { cache, cacheKeys } from '../config/cache';
 import { fetchExchangeRates } from '../services/exchangeRateService';
+import { analyzeCountryEconomy, CountryData } from '../services/aiAnalysisService';
+import { dataLimiter, aiLimiter } from '../middleware/rateLimiter';
+import { aiRequestQueue } from '../utils/requestQueue';
 
 const router = Router();
+
+// Apply rate limiting to all data endpoints
+router.use(dataLimiter);
 
 type RateRow = {
   country_iso: string;
@@ -31,6 +37,8 @@ function formatRatesForMap(rates: any[]) {
   }));
 }
 
+// Deduplicate by country, keeping the most recent data by effective_date
+// This ensures we return the latest available data for each country
 function dedupeLatestByCountry(rows: RateRow[]): RateRow[] {
   const byIso = new Map<string, RateRow>();
   for (const row of rows) {
@@ -40,66 +48,24 @@ function dedupeLatestByCountry(rows: RateRow[]): RateRow[] {
       byIso.set(iso, row);
       continue;
     }
-    const existingTime = new Date(existing.updated_at).getTime();
-    const rowTime = new Date(row.updated_at).getTime();
-    if (rowTime >= existingTime) byIso.set(iso, row);
+    
+    // Compare by effective_date first (actual data date), then updated_at as fallback
+    const existingDate = existing.effective_date 
+      ? new Date(existing.effective_date).getTime() 
+      : new Date(existing.updated_at).getTime();
+    const rowDate = row.effective_date 
+      ? new Date(row.effective_date).getTime() 
+      : new Date(row.updated_at).getTime();
+    
+    // Keep the row with the most recent effective_date
+    if (rowDate >= existingDate) {
+      byIso.set(iso, row);
+    }
   }
   return Array.from(byIso.values());
 }
 
-function fillAllCountries(rows: RateRow[]): RateRow[] {
-  const countries = CountryModel.getAll();
-  const latestRows = dedupeLatestByCountry(rows);
-  const byIso = new Map<string, RateRow>(latestRows.map(r => [r.country_iso, r]));
-
-  // Compute global + region averages from real data
-  const regionSum = new Map<string, { sum: number; count: number }>();
-  let globalSum = 0;
-  let globalCount = 0;
-
-  for (const r of latestRows) {
-    if (typeof r.value !== 'number' || Number.isNaN(r.value)) continue;
-    globalSum += r.value;
-    globalCount += 1;
-
-    const region = countries.find(c => c.iso_code === r.country_iso)?.region || 'Unknown';
-    const agg = regionSum.get(region) || { sum: 0, count: 0 };
-    agg.sum += r.value;
-    agg.count += 1;
-    regionSum.set(region, agg);
-  }
-
-  const globalAvg = globalCount > 0 ? globalSum / globalCount : 0;
-  const nowIso = new Date().toISOString();
-
-  const filled: RateRow[] = [];
-  for (const c of countries) {
-    const existing = byIso.get(c.iso_code);
-    if (existing) {
-      filled.push({ ...existing, country_name: existing.country_name || c.name, is_estimated: false });
-      continue;
-    }
-
-    const region = c.region || 'Unknown';
-    const agg = regionSum.get(region);
-    const regionAvg = agg && agg.count > 0 ? agg.sum / agg.count : null;
-
-    const value = regionAvg ?? globalAvg;
-    filled.push({
-      country_iso: c.iso_code,
-      country_name: c.name,
-      value,
-      currency_code: null,
-      period: null,
-      effective_date: undefined,
-      updated_at: nowIso,
-      is_estimated: true,
-      estimated_from: regionAvg != null ? 'region_avg' : 'global_avg',
-    });
-  }
-
-  return filled;
-}
+// No longer filling missing countries with estimates - only return real data
 
 router.get('/interest', (req, res) => {
   try {
@@ -109,9 +75,9 @@ router.get('/interest', (req, res) => {
       return res.json(cached);
     }
 
-    // Fetch from database
+    // Fetch from database - only real data, no estimates
     const rates = RateModel.getInterestRates();
-    const formatted = fillAllCountries(formatRatesForMap(rates) as RateRow[]);
+    const formatted = dedupeLatestByCountry(formatRatesForMap(rates) as RateRow[]);
 
     // Cache the result
     cache.set(cacheKeys.interestRates, formatted);
@@ -131,9 +97,9 @@ router.get('/inflation', (req, res) => {
       return res.json(cached);
     }
 
-    // Fetch from database
+    // Fetch from database - only real data, no estimates
     const rates = RateModel.getInflationRates();
-    const formatted = fillAllCountries(formatRatesForMap(rates) as RateRow[]);
+    const formatted = dedupeLatestByCountry(formatRatesForMap(rates) as RateRow[]);
 
     // Cache the result
     cache.set(cacheKeys.inflationRates, formatted);
@@ -172,7 +138,7 @@ router.get('/exchange', async (req, res) => {
       }
     }
 
-    const formatted = fillAllCountries(formatRatesForMap(rates) as RateRow[]);
+    const formatted = dedupeLatestByCountry(formatRatesForMap(rates) as RateRow[]);
 
     // Cache the result
     cache.set(cacheKeys.exchangeRates, formatted);
@@ -190,7 +156,7 @@ router.get('/gdp', (req, res) => {
     if (cached) return res.json(cached);
 
     const rates = RateModel.getGDPGrowthRates();
-    const formatted = fillAllCountries(formatRatesForMap(rates) as RateRow[]);
+    const formatted = dedupeLatestByCountry(formatRatesForMap(rates) as RateRow[]);
 
     cache.set(cacheKeys.gdpGrowthRates, formatted);
     res.json(formatted);
@@ -206,7 +172,7 @@ router.get('/unemployment', (req, res) => {
     if (cached) return res.json(cached);
 
     const rates = RateModel.getUnemploymentRates();
-    const formatted = fillAllCountries(formatRatesForMap(rates) as RateRow[]);
+    const formatted = dedupeLatestByCountry(formatRatesForMap(rates) as RateRow[]);
 
     cache.set(cacheKeys.unemploymentRates, formatted);
     res.json(formatted);
@@ -216,12 +182,280 @@ router.get('/unemployment', (req, res) => {
   }
 });
 
+router.get('/government-debt', (req, res) => {
+  try {
+    const cached = cache.get(cacheKeys.governmentDebtRates);
+    if (cached) return res.json(cached);
+
+    const rates = RateModel.getGovernmentDebtRates();
+    const formatted = dedupeLatestByCountry(formatRatesForMap(rates) as RateRow[]);
+
+    cache.set(cacheKeys.governmentDebtRates, formatted);
+    res.json(formatted);
+  } catch (error) {
+    console.error('Error fetching government debt rates:', error);
+    res.status(500).json({ error: 'Failed to fetch government debt rates' });
+  }
+});
+
+router.get('/gdp-per-capita', (req, res) => {
+  try {
+    const cached = cache.get(cacheKeys.gdpPerCapitaRates);
+    if (cached) return res.json(cached);
+
+    const rates = RateModel.getGDPPerCapitaRates();
+    const formatted = dedupeLatestByCountry(formatRatesForMap(rates) as RateRow[]);
+
+    cache.set(cacheKeys.gdpPerCapitaRates, formatted);
+    res.json(formatted);
+  } catch (error) {
+    console.error('Error fetching GDP per capita rates:', error);
+    res.status(500).json({ error: 'Failed to fetch GDP per capita rates' });
+  }
+});
+
+router.get('/trade-balance', (req, res) => {
+  try {
+    const cached = cache.get(cacheKeys.tradeBalanceRates);
+    if (cached) return res.json(cached);
+
+    const rates = RateModel.getTradeBalanceRates();
+    const formatted = dedupeLatestByCountry(formatRatesForMap(rates) as RateRow[]);
+
+    cache.set(cacheKeys.tradeBalanceRates, formatted);
+    res.json(formatted);
+  } catch (error) {
+    console.error('Error fetching trade balance rates:', error);
+    res.status(500).json({ error: 'Failed to fetch trade balance rates' });
+  }
+});
+
+router.get('/current-account', (req, res) => {
+  try {
+    const cached = cache.get(cacheKeys.currentAccountRates);
+    if (cached) return res.json(cached);
+
+    const rates = RateModel.getCurrentAccountRates();
+    const formatted = dedupeLatestByCountry(formatRatesForMap(rates) as RateRow[]);
+
+    cache.set(cacheKeys.currentAccountRates, formatted);
+    res.json(formatted);
+  } catch (error) {
+    console.error('Error fetching current account rates:', error);
+    res.status(500).json({ error: 'Failed to fetch current account rates' });
+  }
+});
+
+router.get('/fdi', (req, res) => {
+  try {
+    const cached = cache.get(cacheKeys.fdiRates);
+    if (cached) return res.json(cached);
+
+    const rates = RateModel.getFDIRates();
+    const formatted = dedupeLatestByCountry(formatRatesForMap(rates) as RateRow[]);
+
+    cache.set(cacheKeys.fdiRates, formatted);
+    res.json(formatted);
+  } catch (error) {
+    console.error('Error fetching FDI rates:', error);
+    res.status(500).json({ error: 'Failed to fetch FDI rates' });
+  }
+});
+
+router.get('/population-growth', (req, res) => {
+  try {
+    const cached = cache.get(cacheKeys.populationGrowthRates);
+    if (cached) return res.json(cached);
+
+    const rates = RateModel.getPopulationGrowthRates();
+    const formatted = dedupeLatestByCountry(formatRatesForMap(rates) as RateRow[]);
+
+    cache.set(cacheKeys.populationGrowthRates, formatted);
+    res.json(formatted);
+  } catch (error) {
+    console.error('Error fetching population growth rates:', error);
+    res.status(500).json({ error: 'Failed to fetch population growth rates' });
+  }
+});
+
+router.get('/life-expectancy', (req, res) => {
+  try {
+    const cached = cache.get(cacheKeys.lifeExpectancyRates);
+    if (cached) return res.json(cached);
+
+    const rates = RateModel.getLifeExpectancyRates();
+    const formatted = dedupeLatestByCountry(formatRatesForMap(rates) as RateRow[]);
+
+    cache.set(cacheKeys.lifeExpectancyRates, formatted);
+    res.json(formatted);
+  } catch (error) {
+    console.error('Error fetching life expectancy rates:', error);
+    res.status(500).json({ error: 'Failed to fetch life expectancy rates' });
+  }
+});
+
+router.get('/gini-coefficient', (req, res) => {
+  try {
+    const cached = cache.get(cacheKeys.giniCoefficientRates);
+    if (cached) return res.json(cached);
+
+    const rates = RateModel.getGiniCoefficientRates();
+    const formatted = dedupeLatestByCountry(formatRatesForMap(rates) as RateRow[]);
+
+    cache.set(cacheKeys.giniCoefficientRates, formatted);
+    res.json(formatted);
+  } catch (error) {
+    console.error('Error fetching Gini coefficient rates:', error);
+    res.status(500).json({ error: 'Failed to fetch Gini coefficient rates' });
+  }
+});
+
+router.get('/exports', (req, res) => {
+  try {
+    const cached = cache.get(cacheKeys.exportsRates);
+    if (cached) return res.json(cached);
+
+    const rates = RateModel.getExportsRates();
+    const formatted = dedupeLatestByCountry(formatRatesForMap(rates) as RateRow[]);
+
+    cache.set(cacheKeys.exportsRates, formatted);
+    res.json(formatted);
+  } catch (error) {
+    console.error('Error fetching exports rates:', error);
+    res.status(500).json({ error: 'Failed to fetch exports rates' });
+  }
+});
+
+// AI analysis endpoint with stricter rate limiting and request queue
+router.get('/analyze/:countryIso', aiLimiter, async (req, res) => {
+  try {
+    const { countryIso } = req.params;
+    if (!countryIso) {
+      return res.status(400).json({ error: 'Country ISO code required' });
+    }
+
+    // Check cache (24 hour TTL = 86400 seconds)
+    const cacheKey = `ai-analysis:${countryIso.toUpperCase()}`;
+    const cached = cache.get(cacheKey);
+    if (cached) {
+      return res.json({ analysis: cached, cached: true });
+    }
+
+    // Fetch all current data for the country
+    const [
+      interestRates,
+      inflationRates,
+      exchangeRates,
+      gdpRates,
+      unemploymentRates,
+      governmentDebtRates,
+      gdpPerCapitaRates,
+      tradeBalanceRates,
+      currentAccountRates,
+      fdiRates,
+      populationGrowthRates,
+      lifeExpectancyRates,
+      giniCoefficientRates,
+      exportsRates,
+    ] = await Promise.all([
+      RateModel.getInterestRates(),
+      RateModel.getInflationRates(),
+      RateModel.getExchangeRates(),
+      RateModel.getGDPGrowthRates(),
+      RateModel.getUnemploymentRates(),
+      RateModel.getGovernmentDebtRates(),
+      RateModel.getGDPPerCapitaRates(),
+      RateModel.getTradeBalanceRates(),
+      RateModel.getCurrentAccountRates(),
+      RateModel.getFDIRates(),
+      RateModel.getPopulationGrowthRates(),
+      RateModel.getLifeExpectancyRates(),
+      RateModel.getGiniCoefficientRates(),
+      RateModel.getExportsRates(),
+    ]);
+
+    const country = CountryModel.getByIso(countryIso.toUpperCase());
+    if (!country) {
+      return res.status(404).json({ error: 'Country not found' });
+    }
+
+    // Get current values
+    const getCurrent = (rates: any[]) => {
+      const rate = rates.find(r => r.country_iso.toUpperCase() === countryIso.toUpperCase());
+      return rate?.rate ?? rate?.rate_to_usd ?? rate?.value;
+    };
+
+    // Get historical data
+    const getHistory = async (type: string) => {
+      const history = RateModel.getHistoricalRates(countryIso.toUpperCase(), type as any);
+      return history
+        .map((h: any) => ({
+          date: h.effective_date || h.updated_at,
+          value: h.rate ?? h.rate_to_usd ?? h.value,
+        }))
+        .filter((h: any) => h.value !== null && h.value !== undefined && !isNaN(h.value))
+        .sort((a: any, b: any) => new Date(a.date).getTime() - new Date(b.date).getTime());
+    };
+
+    const [interestHist, inflationHist, exchangeHist, gdpHist, unemploymentHist, govDebtHist] = await Promise.all([
+      getHistory('interest'),
+      getHistory('inflation'),
+      getHistory('exchange'),
+      getHistory('gdp'),
+      getHistory('unemployment'),
+      getHistory('government-debt'),
+    ]);
+
+    const countryData: CountryData = {
+      countryName: country.name,
+      region: country.region,
+      current: {
+        interestRate: getCurrent(interestRates),
+        inflation: getCurrent(inflationRates),
+        exchangeRate: getCurrent(exchangeRates),
+        gdpGrowth: getCurrent(gdpRates),
+        unemployment: getCurrent(unemploymentRates),
+        governmentDebt: getCurrent(governmentDebtRates),
+        gdpPerCapita: getCurrent(gdpPerCapitaRates),
+        tradeBalance: getCurrent(tradeBalanceRates),
+        currentAccount: getCurrent(currentAccountRates),
+        fdi: getCurrent(fdiRates),
+        populationGrowth: getCurrent(populationGrowthRates),
+        lifeExpectancy: getCurrent(lifeExpectancyRates),
+        giniCoefficient: getCurrent(giniCoefficientRates),
+        exports: getCurrent(exportsRates),
+      },
+      historical: {
+        interest: interestHist,
+        inflation: inflationHist,
+        exchange: exchangeHist,
+        gdp: gdpHist,
+        unemployment: unemploymentHist,
+        'government-debt': govDebtHist,
+      },
+    };
+
+    // Generate analysis using request queue to limit concurrent requests
+    const analysis = await aiRequestQueue.add(async () => {
+      return await analyzeCountryEconomy(countryData);
+    });
+
+    // Cache for 24 hours (86400 seconds)
+    cache.set(cacheKey, analysis, 86400);
+
+    res.json({ analysis, cached: false });
+  } catch (error: any) {
+    console.error('Error generating AI analysis:', error);
+    res.status(500).json({ error: error.message || 'Failed to generate analysis' });
+  }
+});
+
 router.get('/history/:countryIso/:type', (req, res) => {
   try {
     const { countryIso, type } = req.params;
 
     // Basic validation
-    if (!countryIso || !['interest', 'inflation', 'exchange', 'gdp', 'unemployment'].includes(type)) {
+    if (!countryIso || !['interest', 'inflation', 'exchange', 'gdp', 'unemployment', 'government-debt', 'gdp-per-capita', 'trade-balance', 'current-account', 'fdi', 'population-growth', 'life-expectancy', 'gini-coefficient', 'exports'].includes(type)) {
       return res.status(400).json({ error: 'Invalid country code or data type' });
     }
 

@@ -21,7 +21,7 @@ export default function Legend({ dataType, rateData }: LegendProps) {
   const getTitle = (): string => {
     switch (dataType) {
       case 'interest':
-        return 'Interest Rate (%)';
+        return 'Real Interest Rate (%)';
       case 'inflation':
         return 'Inflation Rate (%)';
       case 'exchange':
@@ -30,6 +30,8 @@ export default function Legend({ dataType, rateData }: LegendProps) {
         return 'GDP Growth Rate (%)';
       case 'unemployment':
         return 'Unemployment Rate (%)';
+      case 'government-debt':
+        return 'Government Debt (% of GDP)';
       default:
         return 'Rate';
     }

@@ -1,4 +1,4 @@
-export type DataType = 'interest' | 'inflation' | 'exchange' | 'gdp' | 'unemployment';
+export type DataType = 'interest' | 'inflation' | 'exchange' | 'gdp' | 'unemployment' | 'government-debt' | 'gdp-per-capita' | 'trade-balance' | 'current-account' | 'fdi' | 'population-growth' | 'life-expectancy' | 'gini-coefficient' | 'exports';
 
 
 export interface Country {

@@ -118,6 +118,24 @@ function getPalette(dataType: DataType, bins: number): string[] {
     gdp: ['#f7fcf5', '#e5f5e0', '#c7e9c0', '#a1d99b', '#74c476', '#41ab5d', '#238b45'],
     // Reds (Unemployment - High is bad)
     unemployment: ['#fef0d9', '#fdd49e', '#fdbb84', '#fc8d59', '#ef6548', '#d73027', '#990000'],
+    // Green-to-Red (Government Debt - Low is good, High is bad)
+    'government-debt': ['#238b45', '#41ab5d', '#74c476', '#ffd93d', '#ff9800', '#f44336', '#b71c1c'],
+    // Gold-to-Purple (GDP Per Capita - High is good, wealth indicator)
+    'gdp-per-capita': ['#fff7bc', '#fee391', '#fec44f', '#fe9929', '#d95f0e', '#993404', '#662506'],
+    // Blue-to-Red diverging (Trade Balance - Positive is good, negative is bad)
+    'trade-balance': ['#2166ac', '#4393c3', '#92c5de', '#d1e5f0', '#fddbc7', '#f4a582', '#d6604d', '#b2182b'],
+    // Blue-to-Red diverging (Current Account - Positive is good, negative is bad)
+    'current-account': ['#2166ac', '#4393c3', '#92c5de', '#d1e5f0', '#fddbc7', '#f4a582', '#d6604d', '#b2182b'],
+    // Green gradient (FDI - High is good, investment indicator)
+    'fdi': ['#f7fcf5', '#e5f5e0', '#c7e9c0', '#a1d99b', '#74c476', '#41ab5d', '#238b45'],
+    // Blue gradient (Population Growth - Neutral growth indicator)
+    'population-growth': ['#f7fbff', '#deebf7', '#c6dbef', '#9ecae1', '#6baed6', '#4292c6', '#2171b5', '#084594'],
+    // Green gradient (Life Expectancy - Higher is better, health indicator)
+    'life-expectancy': ['#f7fcf5', '#e5f5e0', '#c7e9c0', '#a1d99b', '#74c476', '#41ab5d', '#238b45'],
+    // Red gradient (Gini Coefficient - Higher is worse, inequality indicator)
+    'gini-coefficient': ['#fff5f0', '#fee0d2', '#fcbba1', '#fc9272', '#fb6a4a', '#ef3b2c', '#cb181d', '#99000d'],
+    // Blue gradient (Exports - Higher is better, trade openness)
+    'exports': ['#eff3ff', '#c6dbef', '#9ecae1', '#6baed6', '#4292c6', '#2171b5', '#08519c'],
   };
 
   const base = palettes[dataType] || palettes.interest;
@@ -164,7 +182,13 @@ export function buildQuantileScale(
     return {
       breaks,
       colors,
-      format: (v) => (dataType === 'exchange' ? v.toFixed(4) : `${v.toFixed(2)}%`),
+      format: (v) => {
+        if (dataType === 'exchange') return v.toFixed(4);
+        if (dataType === 'gdp-per-capita') return `$${v.toLocaleString('en-US', { maximumFractionDigits: 0 })}`;
+        if (dataType === 'life-expectancy') return `${v.toFixed(1)} years`;
+        if (dataType === 'gini-coefficient') return v.toFixed(2);
+        return `${v.toFixed(2)}%`;
+      },
       getBin: () => null,
       getColor: () => '#e0e0e0',
     };
@@ -181,10 +205,23 @@ export function buildQuantileScale(
     if (breaks[i] < breaks[i - 1]) breaks[i] = breaks[i - 1];
   }
 
-  const format = (v: number) => (dataType === 'exchange' ? v.toFixed(4) : `${v.toFixed(2)}%`);
+  const format = (v: number) => {
+    if (dataType === 'exchange') return v.toFixed(4);
+    if (dataType === 'gdp-per-capita') return `$${v.toLocaleString('en-US', { maximumFractionDigits: 0 })}`;
+    if (dataType === 'life-expectancy') return `${v.toFixed(1)} years`;
+    if (dataType === 'gini-coefficient') return v.toFixed(2);
+    return `${v.toFixed(2)}%`;
+  };
 
   const getBin = (value: number | null) => {
     if (value === null || Number.isNaN(value)) return null;
+    
+    // Handle case where all breaks are the same (all values identical)
+    const allSame = breaks.every(b => b === breaks[0]);
+    if (allSame && value === breaks[0]) {
+      return { idx: Math.floor(safeBins / 2), from: breaks[0], to: breaks[0] };
+    }
+    
     // Find first break above value; bin is previous
     for (let i = 1; i < breaks.length; i++) {
       if (value <= breaks[i]) {

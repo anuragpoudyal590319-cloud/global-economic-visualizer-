@@ -23,25 +23,42 @@ export default function HistoryChart({ data, type, color, loading }: HistoryChar
 
         // Sort by date just in case
         return [...data]
-            .sort((a, b) => new Date(a.effective_date).getTime() - new Date(b.effective_date).getTime())
-            .map(item => ({
-                date: item.effective_date,
-                // Handle different value key names from different tables if necessary, 
-                // but our API standardizes on returning the raw DB row usually.
-                // The DB columns are 'rate' or 'rate_to_usd' usually.
-                value: item.rate !== undefined ? item.rate : (item.rate_to_usd !== undefined ? item.rate_to_usd : item.value),
-                year: new Date(item.effective_date).getFullYear(),
-            }));
+            .filter(item => {
+                // Filter out items without valid dates or values
+                const date = item.effective_date || item.updated_at;
+                const value = item.rate !== undefined ? item.rate : (item.rate_to_usd !== undefined ? item.rate_to_usd : item.value);
+                return date && value !== undefined && value !== null && !Number.isNaN(value);
+            })
+            .sort((a, b) => {
+                const dateA = new Date(a.effective_date || a.updated_at).getTime();
+                const dateB = new Date(b.effective_date || b.updated_at).getTime();
+                return dateA - dateB;
+            })
+            .map(item => {
+                const date = item.effective_date || item.updated_at;
+                const value = item.rate !== undefined ? item.rate : (item.rate_to_usd !== undefined ? item.rate_to_usd : item.value);
+                return {
+                    date: date,
+                    value: Number(value),
+                    year: new Date(date).getFullYear(),
+                };
+            });
     }, [data]);
 
     const formatYAxis = (val: number) => {
         if (type === 'exchange') return val.toFixed(2);
+        if (type === 'gdp-per-capita') return `$${val.toLocaleString('en-US', { maximumFractionDigits: 0 })}`;
+        if (type === 'life-expectancy') return `${val.toFixed(0)}`;
+        if (type === 'gini-coefficient') return val.toFixed(1);
         return `${val}%`;
     };
 
     const formatTooltip = (val: number | undefined) => {
         if (val === undefined) return ['N/A', 'Rate'];
         if (type === 'exchange') return [val.toFixed(4), 'Rate'];
+        if (type === 'gdp-per-capita') return [`$${val.toLocaleString('en-US', { maximumFractionDigits: 0 })}`, 'GDP Per Capita'];
+        if (type === 'life-expectancy') return [`${val.toFixed(1)} years`, 'Life Expectancy'];
+        if (type === 'gini-coefficient') return [val.toFixed(2), 'Gini Coefficient'];
         return [`${val.toFixed(2)}%`, 'Rate'];
     };
 

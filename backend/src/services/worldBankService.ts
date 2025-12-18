@@ -1,6 +1,7 @@
 import axios from 'axios';
 import { RateModel } from '../models/Rate';
 import { CountryModel } from '../models/Country';
+import { worldBankLimiter } from '../utils/apiRateLimiter';
 
 const WORLD_BANK_API_URL = process.env.WORLD_BANK_API_URL || 'https://api.worldbank.org/v2';
 
@@ -13,69 +14,110 @@ function getWorldBankCountryCode(isoCode: string): string {
   return WB_COUNTRY_CODE_MAP[isoCode] || isoCode;
 }
 
-// Generic fetcher for World Bank indicators
+// Map World Bank ISO3 codes to our ISO-3166-1 alpha-2 codes
+function getIso2FromIso3(iso3: string, countries: any[]): string | null {
+  const country = countries.find(c => c.iso_code_3 === iso3);
+  return country ? country.iso_code : null;
+}
+
+// Generic fetcher for World Bank indicators using bulk endpoint
+// Optimized to fetch latest data first, then historical for charts
 async function fetchIndicator(
   indicatorCode: string,
   onData: (countryIso: string, value: number, date: string) => void,
   label: string
 ) {
   try {
-    console.log(`Fetching ${label} from World Bank...`);
+    console.log(`Fetching ${label} from World Bank (optimized for latest data)...`);
 
     const countries = CountryModel.getAll();
-    let successCount = 0;
-    let errorCount = 0;
+    const currentYear = new Date().getFullYear();
+    
+    // Strategy: Fetch latest 3 years first (for current values), then historical for charts
+    // This ensures we get the most recent data quickly
+    const latestDateRange = `${currentYear - 2}:${currentYear}`;
+    const historicalDateRange = `${currentYear - 15}:${currentYear - 3}`;
+    
+    let totalRecords = 0;
+    let countriesUpdated = new Set<string>();
+    const perPage = 10000;
 
-    // Batch sizing
-    const batchSize = 10;
+    // Helper function to fetch and process a date range
+    const fetchDateRange = async (dateRange: string, rangeLabel: string) => {
+      let page = 1;
+      let rangeRecords = 0;
 
-    // Fetch last 15 years of data to populate history
-    const dateRange = `${new Date().getFullYear() - 15}:${new Date().getFullYear()}`;
-
-    for (let i = 0; i < countries.length; i += batchSize) {
-      const batch = countries.slice(i, i + batchSize);
-
-      for (const country of batch) {
+      while (true) {
         try {
-          const wbCode = getWorldBankCountryCode(country.iso_code);
-          // Fetch historical data with date query
-          const url = `${WORLD_BANK_API_URL}/country/${wbCode}/indicator/${indicatorCode}?format=json&per_page=20&date=${dateRange}`;
-
-          const response = await axios.get(url);
+          // Wait for rate limiter before making API call
+          await worldBankLimiter.wait();
+          
+          const url = `${WORLD_BANK_API_URL}/countries/all/indicators/${indicatorCode}?format=json&per_page=${perPage}&date=${dateRange}&page=${page}`;
+          
+          const response = await axios.get(url, { timeout: 30000 });
           const data = response.data;
 
-          if (data && data[1] && Array.isArray(data[1])) {
-            const records = data[1];
-            let recordsProcessed = 0;
-
-            for (const record of records) {
-              const value = parseFloat(record.value);
-              if (!isNaN(value)) {
-                // Determine date
-                // World Bank returns "date" as "2022" for yearly data.
-                // We'll normalize to ISO date (e.g. 2022-01-01) for consistency.
-                const year = parseInt(record.date);
-                const isoDate = !isNaN(year) ? `${year}-01-01` : null;
-
-                if (isoDate) {
-                  onData(country.iso_code, value, isoDate);
-                  recordsProcessed++;
-                }
-              }
-            }
-            if (recordsProcessed > 0) successCount++;
+          if (!data || !Array.isArray(data) || data.length < 2 || !Array.isArray(data[1])) {
+            break;
           }
 
-          // Rate limiting
-          await new Promise(resolve => setTimeout(resolve, 50));
-        } catch (error) {
-          errorCount++;
-          // console.warn(`Failed to fetch ${label} for ${country.iso_code}`);
+          const records = data[1];
+          if (records.length === 0) {
+            break;
+          }
+
+          const pagination = data[0];
+          if (pagination && pagination.page && pagination.pages && page === 1) {
+            console.log(`  ${rangeLabel}: Processing ${pagination.pages} page(s)...`);
+          }
+
+          for (const record of records) {
+            const value = parseFloat(record.value);
+            if (isNaN(value)) continue;
+
+            const iso3 = record.countryiso3code;
+            if (!iso3) continue;
+
+            const iso2 = getIso2FromIso3(iso3, countries);
+            if (!iso2) continue;
+
+            const year = parseInt(record.date);
+            if (isNaN(year)) continue;
+
+            const isoDate = `${year}-01-01`;
+            onData(iso2, value, isoDate);
+            countriesUpdated.add(iso2);
+            totalRecords++;
+            rangeRecords++;
+          }
+
+          if (pagination && pagination.page >= pagination.pages) {
+            break;
+          }
+
+          page++;
+          await new Promise(resolve => setTimeout(resolve, 150)); // Reduced delay for efficiency
+        } catch (error: any) {
+          if (error.response?.status === 502) {
+            console.warn(`  ${rangeLabel} page ${page} returned 502, retrying...`);
+            await new Promise(resolve => setTimeout(resolve, 2000));
+            continue;
+          }
+          console.error(`  Error fetching ${rangeLabel} page ${page}:`, error.message);
+          break;
         }
       }
-    }
 
-    console.log(`${label}: ${successCount} countries updated successfully, ${errorCount} errors`);
+      return rangeRecords;
+    };
+
+    // Fetch latest data first (most important for current values)
+    await fetchDateRange(latestDateRange, 'Latest data');
+    
+    // Then fetch historical data for charts (less critical, can be slower)
+    await fetchDateRange(historicalDateRange, 'Historical data');
+
+    console.log(`${label}: ${totalRecords} records processed, ${countriesUpdated.size} countries updated`);
   } catch (error) {
     console.error(`Error fetching ${label}:`, error);
     throw error;
@@ -129,4 +171,112 @@ export async function fetchUnemploymentRates(): Promise<void> {
       effective_date: date,
     });
   }, 'Unemployment Rates');
+}
+
+export async function fetchGovernmentDebtRates(): Promise<void> {
+  // GC.DOD.TOTL.GD.ZS = Central government debt, total (% of GDP)
+  await fetchIndicator('GC.DOD.TOTL.GD.ZS', (iso, val, date) => {
+    RateModel.upsertGovernmentDebtRate({
+      country_iso: iso,
+      rate: val,
+      source: 'worldbank',
+      effective_date: date,
+    });
+  }, 'Government Debt Rates');
+}
+
+export async function fetchGDPPerCapitaRates(): Promise<void> {
+  // NY.GDP.PCAP.CD = GDP per capita (current US$)
+  await fetchIndicator('NY.GDP.PCAP.CD', (iso, val, date) => {
+    RateModel.upsertGDPPerCapitaRate({
+      country_iso: iso,
+      rate: val,
+      source: 'worldbank',
+      effective_date: date,
+    });
+  }, 'GDP Per Capita Rates');
+}
+
+export async function fetchTradeBalanceRates(): Promise<void> {
+  // NE.TRD.GNFS.ZS = Trade (% of GDP)
+  await fetchIndicator('NE.TRD.GNFS.ZS', (iso, val, date) => {
+    RateModel.upsertTradeBalanceRate({
+      country_iso: iso,
+      rate: val,
+      source: 'worldbank',
+      effective_date: date,
+    });
+  }, 'Trade Balance Rates');
+}
+
+export async function fetchCurrentAccountRates(): Promise<void> {
+  // BN.CAB.XOKA.GD.ZS = Current account balance (% of GDP)
+  await fetchIndicator('BN.CAB.XOKA.GD.ZS', (iso, val, date) => {
+    RateModel.upsertCurrentAccountRate({
+      country_iso: iso,
+      rate: val,
+      source: 'worldbank',
+      effective_date: date,
+    });
+  }, 'Current Account Rates');
+}
+
+export async function fetchFDIRates(): Promise<void> {
+  // BX.KLT.DINV.WD.GD.ZS = Foreign direct investment, net inflows (% of GDP)
+  await fetchIndicator('BX.KLT.DINV.WD.GD.ZS', (iso, val, date) => {
+    RateModel.upsertFDIRate({
+      country_iso: iso,
+      rate: val,
+      source: 'worldbank',
+      effective_date: date,
+    });
+  }, 'FDI Rates');
+}
+
+export async function fetchPopulationGrowthRates(): Promise<void> {
+  // SP.POP.GROW = Population growth (annual %)
+  await fetchIndicator('SP.POP.GROW', (iso, val, date) => {
+    RateModel.upsertPopulationGrowthRate({
+      country_iso: iso,
+      rate: val,
+      source: 'worldbank',
+      effective_date: date,
+    });
+  }, 'Population Growth Rates');
+}
+
+export async function fetchLifeExpectancyRates(): Promise<void> {
+  // SP.DYN.LE00.IN = Life expectancy at birth, total (years)
+  await fetchIndicator('SP.DYN.LE00.IN', (iso, val, date) => {
+    RateModel.upsertLifeExpectancyRate({
+      country_iso: iso,
+      rate: val,
+      source: 'worldbank',
+      effective_date: date,
+    });
+  }, 'Life Expectancy Rates');
+}
+
+export async function fetchGiniCoefficientRates(): Promise<void> {
+  // SI.POV.GINI = Gini coefficient
+  await fetchIndicator('SI.POV.GINI', (iso, val, date) => {
+    RateModel.upsertGiniCoefficientRate({
+      country_iso: iso,
+      rate: val,
+      source: 'worldbank',
+      effective_date: date,
+    });
+  }, 'Gini Coefficient Rates');
+}
+
+export async function fetchExportsRates(): Promise<void> {
+  // NE.EXP.GNFS.ZS = Exports of goods and services (% of GDP)
+  await fetchIndicator('NE.EXP.GNFS.ZS', (iso, val, date) => {
+    RateModel.upsertExportsRate({
+      country_iso: iso,
+      rate: val,
+      source: 'worldbank',
+      effective_date: date,
+    });
+  }, 'Exports Rates');
 }

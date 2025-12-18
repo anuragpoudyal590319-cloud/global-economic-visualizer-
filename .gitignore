@@ -12,6 +12,8 @@ node_modules/
 # Build outputs
 dist/
 build/
+backend/dist/
+frontend/dist/
 *.log
 
 # IDE
