@@ -30,19 +30,54 @@ export async function checkAndFetchDataOnStartup(): Promise<void> {
   try {
     const data = (db as any).data;
     
-    // Check if we have any economic data
+    // Check if we have all critical economic data
     const hasExchangeRates = data.exchange_rates && data.exchange_rates.length > 0;
     const hasInterestRates = data.interest_rates && data.interest_rates.length > 0;
     const hasInflationRates = data.inflation_rates && data.inflation_rates.length > 0;
+    const hasLifeExpectancy = data.life_expectancy_rates && data.life_expectancy_rates.length > 0;
+    const hasExports = data.exports_rates && data.exports_rates.length > 0;
     
-    // If we have at least exchange rates and one other indicator, we're good
-    const hasData = hasExchangeRates && (hasInterestRates || hasInflationRates);
+    // Check if we have at least the core indicators
+    // We need exchange rates + at least 2 other major indicators
+    const coreIndicators = [
+      hasInterestRates,
+      hasInflationRates,
+      hasLifeExpectancy,
+      hasExports
+    ].filter(Boolean).length;
+    
+    const hasData = hasExchangeRates && coreIndicators >= 2;
     
     if (hasData) {
-      console.log('✅ Database has data, skipping initial fetch');
+      console.log('✅ Database has sufficient data, skipping initial fetch');
       console.log(`   Exchange rates: ${data.exchange_rates?.length || 0} records`);
       console.log(`   Interest rates: ${data.interest_rates?.length || 0} records`);
       console.log(`   Inflation rates: ${data.inflation_rates?.length || 0} records`);
+      console.log(`   Life Expectancy: ${data.life_expectancy_rates?.length || 0} records`);
+      console.log(`   Exports: ${data.exports_rates?.length || 0} records`);
+      
+      // If we're missing Life Expectancy or Exports, fetch just those
+      if (!hasLifeExpectancy || !hasExports) {
+        console.log('⚠️  Some indicators are missing, fetching missing data...');
+        setImmediate(async () => {
+          try {
+            if (!hasLifeExpectancy) {
+              console.log('   Fetching Life Expectancy...');
+              await fetchLifeExpectancyRates();
+              cache.del(cacheKeys.lifeExpectancyRates);
+              console.log('✅ Life Expectancy updated');
+            }
+            if (!hasExports) {
+              console.log('   Fetching Exports...');
+              await fetchExportsRates();
+              cache.del(cacheKeys.exportsRates);
+              console.log('✅ Exports updated');
+            }
+          } catch (error) {
+            console.error('❌ Error fetching missing indicators:', error);
+          }
+        });
+      }
       return;
     }
     
