@@ -48,17 +48,34 @@ router.post('/fetch-data', async (req, res) => {
 
         // Fetch all World Bank indicators sequentially
         console.log('📈 Fetching World Bank indicators...');
-        await fetchInterestRates();
-        cache.del(cacheKeys.interestRates);
-        console.log('✅ Interest rates updated');
+        console.log('   This will take 10-15 minutes due to World Bank API rate limits.');
+        console.log('   Progress will be logged as each indicator completes.');
+        
+        try {
+          console.log('   Starting interest rates fetch...');
+          await fetchInterestRates();
+          cache.del(cacheKeys.interestRates);
+          console.log('✅ Interest rates updated');
+        } catch (error) {
+          console.error('❌ Error fetching interest rates:', error);
+          console.error('   Continuing with other indicators...');
+        }
 
-        await fetchInflationRates();
-        cache.del(cacheKeys.inflationRates);
-        console.log('✅ Inflation rates updated');
+        try {
+          await fetchInflationRates();
+          cache.del(cacheKeys.inflationRates);
+          console.log('✅ Inflation rates updated');
+        } catch (error) {
+          console.error('❌ Error fetching inflation rates:', error);
+        }
 
-        await fetchGDPGrowthRates();
-        cache.del(cacheKeys.gdpGrowthRates);
-        console.log('✅ GDP growth updated');
+        try {
+          await fetchGDPGrowthRates();
+          cache.del(cacheKeys.gdpGrowthRates);
+          console.log('✅ GDP growth updated');
+        } catch (error) {
+          console.error('❌ Error fetching GDP growth:', error);
+        }
 
         await fetchUnemploymentRates();
         cache.del(cacheKeys.unemploymentRates);
@@ -103,6 +120,7 @@ router.post('/fetch-data', async (req, res) => {
         console.log('✅ All data fetch complete!');
       } catch (error) {
         console.error('❌ Error during data fetch:', error);
+        console.error('Error stack:', error instanceof Error ? error.stack : 'No stack trace');
       }
     });
 
